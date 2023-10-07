@@ -31,11 +31,14 @@ import net.dv8tion.jda.api.events.guild.GuildUnbanEvent;
 import net.dv8tion.jda.api.events.guild.invite.GenericGuildInviteEvent;
 import net.dv8tion.jda.api.events.guild.member.GenericGuildMemberEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
+import net.dv8tion.jda.api.events.guild.scheduledevent.GenericScheduledEventGatewayEvent;
 import net.dv8tion.jda.api.events.guild.scheduledevent.update.GenericScheduledEventUpdateEvent;
 import net.dv8tion.jda.api.events.guild.voice.GenericGuildVoiceEvent;
 import net.dv8tion.jda.api.events.message.GenericMessageEvent;
 import net.dv8tion.jda.api.events.message.MessageBulkDeleteEvent;
 import net.dv8tion.jda.api.events.message.react.GenericMessageReactionEvent;
+import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveAllEvent;
+import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEmojiEvent;
 import net.dv8tion.jda.api.events.sticker.GenericGuildStickerEvent;
 import net.dv8tion.jda.api.events.user.UserTypingEvent;
 import net.dv8tion.jda.api.events.user.update.GenericUserPresenceEvent;
@@ -409,7 +412,7 @@ public enum GatewayIntent
                 intents.add(GUILD_MODERATION);
             else if (GenericEmojiEvent.class.isAssignableFrom(event) || GenericGuildStickerEvent.class.isAssignableFrom(event))
                 intents.add(GUILD_EMOJIS_AND_STICKERS);
-            else if (GenericScheduledEventUpdateEvent.class.isAssignableFrom(event))
+            else if (GenericScheduledEventUpdateEvent.class.isAssignableFrom(event) || GenericScheduledEventGatewayEvent.class.isAssignableFrom(event))
                 intents.add(SCHEDULED_EVENTS);
             else if (GenericGuildInviteEvent.class.isAssignableFrom(event))
                 intents.add(GUILD_INVITES);
@@ -417,13 +420,16 @@ public enum GatewayIntent
                 intents.add(GUILD_VOICE_STATES);
 
             else if (MessageBulkDeleteEvent.class.isAssignableFrom(event))
-                intents.add(GUILD_MESSAGES);
+                Collections.addAll(intents, GUILD_MESSAGES, DIRECT_MESSAGES);
 
             else if (GenericMessageReactionEvent.class.isAssignableFrom(event))
                 Collections.addAll(intents, GUILD_MESSAGE_REACTIONS, DIRECT_MESSAGE_REACTIONS);
 
             else if (GenericMessageEvent.class.isAssignableFrom(event))
-                Collections.addAll(intents, GUILD_MESSAGES, DIRECT_MESSAGES);
+                if (MessageReactionRemoveEmojiEvent.class.isAssignableFrom(event) || MessageReactionRemoveAllEvent.class.isAssignableFrom(event))
+                    Collections.addAll(intents, GUILD_MESSAGE_REACTIONS, DIRECT_MESSAGE_REACTIONS);
+                else
+                    Collections.addAll(intents, GUILD_MESSAGES, DIRECT_MESSAGES);
 
             else if (UserTypingEvent.class.isAssignableFrom(event))
                 Collections.addAll(intents, GUILD_MESSAGE_TYPING, DIRECT_MESSAGE_TYPING);
