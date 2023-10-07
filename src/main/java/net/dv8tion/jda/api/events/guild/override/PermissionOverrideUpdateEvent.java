@@ -18,6 +18,7 @@ package net.dv8tion.jda.api.events.guild.override;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.PermissionOverride;
 import net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
@@ -29,6 +30,12 @@ import java.util.EnumSet;
  * Indicates that a {@link PermissionOverride} in a {@link IPermissionContainer guild channel} has been updated.
  *
  * <p>Can be used to retrieve the updated override and old {@link #getOldAllow() allow} and {@link #getOldDeny() deny}.
+ *
+ * <p><b>Note:</b> This event will <b>not</b> be fired when the {@link Guild#getPublicRole() @everyone} override:
+ * <ul>
+ *     <li>Is modified, but previously had no allowed/denied permissions, in which case {@link PermissionOverrideCreateEvent} is fired</li>
+ *     <li>Had allowed/denied permissions, but has been cleared, in which case {@link PermissionOverrideDeleteEvent} is fired</li>
+ * </ul>
  *
  * <p><b>Requirements</b><br>
  *
