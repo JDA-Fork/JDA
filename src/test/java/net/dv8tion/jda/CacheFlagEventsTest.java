@@ -69,31 +69,44 @@ public class CacheFlagEventsTest
     }
 
     @Test
-    public void testDocumentedFlags() throws Exception
+    public void testFlagMismatches() throws Exception
     {
-        // Check for documented flags retrieved with #fromEvents
+        // Check that #fromEvents gives the same flags that are documented
+        // First find what flags each class uses
+        final Map<Class<GenericEvent>, EnumSet<CacheFlag>> flagsByClass = new HashMap<>();
         for (TypeDeclaration<?> typeDeclaration : compilationUnits.stream().flatMap(c -> c.findAll(TypeDeclaration.class).stream()).collect(Collectors.toList()))
         {
             final String qualifiedEventName = typeDeclaration.getFullyQualifiedName().orElseThrow(AssertionError::new);
-            if (IGNORED_CLASSES.contains(qualifiedEventName))
-                continue;
 
             final JavadocDescription description = typeDeclaration
                     .getJavadoc()
                     .map(Javadoc::getDescription)
                     .orElse(null);
             if (description == null)
+            {
+                LOGGER.warn("Undocumented class at {}", qualifiedEventName);
                 continue;
+            }
 
             final List<String> links = getLinks(description);
             final EnumSet<CacheFlag> expectedFlags = mapLinks(CacheFlag.class, links, CACHE_FLAG_REFERENCE_PATTERN);
+            flagsByClass.put((Class<GenericEvent>) Class.forName(qualifiedEventName), expectedFlags);
+        }
 
-            if (expectedFlags.isEmpty()) continue;
+        // Then find subtypes of events and check the map
+        for (Class<GenericEvent> eventClass : flagsByClass.keySet())
+        {
+            if (IGNORED_CLASSES.contains(eventClass.getName()))
+                continue;
 
-            @SuppressWarnings("unchecked")
-            final Class<? extends GenericEvent> eventClass = (Class<? extends GenericEvent>) Class.forName(qualifiedEventName);
+            final EnumSet<CacheFlag> documentedFlags = flagsByClass.get(eventClass);
+            final EnumSet<CacheFlag> requiredFlags = CacheFlag.fromEvents(eventClass);
 
-            Assertions.assertEquals(expectedFlags, CacheFlag.fromEvents(eventClass), "Documented flags in " + typeDeclaration.getNameAsString() + " are not returned by #fromEvents");
+            Assertions.assertEquals(
+                    documentedFlags,
+                    requiredFlags,
+                    "Documented flags from " + eventClass.getSimpleName() + " " + documentedFlags + " does not correspond to flags given by #fromEvents: " + requiredFlags
+            );
         }
     }
 
