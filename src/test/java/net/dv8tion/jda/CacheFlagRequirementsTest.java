@@ -34,11 +34,11 @@ public class CacheFlagRequirementsTest
     private static final Logger LOGGER = JDALogger.getLog(CacheFlagRequirementsTest.class);
     private static final Pattern LINK_SPLIT_PATTERN = Pattern.compile("(?<!,)\\s+");
 
-    private static final Set<String> IGNORED_CLASSES = new HashSet<>(Arrays.asList(
-            PermissionOverrideCreateEvent.class.getName(),
-            PermissionOverrideUpdateEvent.class.getName(),
-            PermissionOverrideDeleteEvent.class.getName(),
-            GenericPermissionOverrideEvent.class.getName()
+    private static final Set<Class<? extends GenericEvent>> IGNORED_CLASSES = new HashSet<>(Arrays.asList(
+            PermissionOverrideCreateEvent.class,
+            PermissionOverrideUpdateEvent.class,
+            PermissionOverrideDeleteEvent.class,
+            GenericPermissionOverrideEvent.class
     ));
 
     private static Reflections events;
@@ -137,7 +137,7 @@ public class CacheFlagRequirementsTest
         // Check that #fromEvents gives the same flags that are documented
         for (Class<GenericEvent> eventClass : flagsByClass.keySet())
         {
-            if (IGNORED_CLASSES.contains(eventClass.getName()))
+            if (IGNORED_CLASSES.contains(eventClass))
                 continue;
 
             final EnumSet<CacheFlag> documentedFlags = flagsByClass.get(eventClass);
