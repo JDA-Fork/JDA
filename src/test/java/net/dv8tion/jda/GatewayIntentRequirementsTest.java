@@ -18,6 +18,7 @@ import java.util.*;
 
 public class GatewayIntentRequirementsTest
 {
+    // Classes which will not be required to inherit intent requirements from supertypes
     private static final Set<Class<? extends GenericEvent>> IGNORE_INHERITANCE = new HashSet<>(Arrays.asList(
             MessageReactionRemoveEmojiEvent.class, //Extends GenericMessageEvent, but does not require the same intents
             MessageReactionRemoveAllEvent.class, //Extends GenericMessageEvent, but does not require the same intents
@@ -28,6 +29,7 @@ public class GatewayIntentRequirementsTest
             MessageReactionRemoveEvent.class, // Does not require messages
             MessageReactionAddEvent.class // Does not require messages
     ));
+    // Classes which have document intents, but are optional, and thus not given by #fromEvents
     private static final Map<Class<? extends GenericEvent>, EnumSet<GatewayIntent>> OPTIONAL_INTENTS = new HashMap<Class<? extends GenericEvent>, EnumSet<GatewayIntent>>() {{
         put(AutoModExecutionEvent.class, EnumSet.of(GatewayIntent.MESSAGE_CONTENT));
     }};
