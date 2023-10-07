@@ -47,9 +47,19 @@ public class CacheFlagRequirementsTest
     @BeforeAll
     static void setup() throws IOException, ClassNotFoundException
     {
+        final List<CompilationUnit> compilationUnits = parseEventCompilationUnits();
+
+        flagsByClass = getEnumEntriesByClass(CacheFlag.class, compilationUnits);
+
+        events = new Reflections("net.dv8tion.jda.api.events");
+    }
+
+    @Nonnull
+    public static List<CompilationUnit> parseEventCompilationUnits() throws IOException
+    {
         final SourceRoot root = new SourceRoot(Paths.get("src", "main", "java"));
         final List<ParseResult<CompilationUnit>> parseResults = root.tryToParse(Event.class.getPackage().getName());
-        List<CompilationUnit> compilationUnits = parseResults.stream()
+        return parseResults.stream()
                 .filter(p ->
                 {
                     if (!p.getProblems().isEmpty())
@@ -61,10 +71,6 @@ public class CacheFlagRequirementsTest
                 })
                 .map(r -> r.getResult().get())
                 .collect(Collectors.toList());
-
-        flagsByClass = getEnumEntriesByClass(CacheFlag.class, compilationUnits);
-
-        events = new Reflections("net.dv8tion.jda.api.events");
     }
 
     @SuppressWarnings("unchecked")
