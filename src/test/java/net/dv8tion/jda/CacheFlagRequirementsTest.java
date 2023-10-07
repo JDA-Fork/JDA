@@ -29,9 +29,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class CacheFlagEventsTest
+public class CacheFlagRequirementsTest
 {
-    private static final Logger LOGGER = JDALogger.getLog(CacheFlagEventsTest.class);
+    private static final Logger LOGGER = JDALogger.getLog(CacheFlagRequirementsTest.class);
     private static final Pattern LINK_SPLIT_PATTERN = Pattern.compile("(?<!,)\\s+");
 
     private static final Set<String> IGNORED_CLASSES = new HashSet<>(Arrays.asList(
