@@ -14,10 +14,14 @@ import net.dv8tion.jda.api.events.guild.override.PermissionOverrideCreateEvent;
 import net.dv8tion.jda.api.events.guild.override.PermissionOverrideDeleteEvent;
 import net.dv8tion.jda.api.events.guild.override.PermissionOverrideUpdateEvent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
+import net.dv8tion.jda.internal.utils.JDALogger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.reflections.Reflections;
+import org.slf4j.Logger;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
@@ -27,6 +31,7 @@ import java.util.stream.Collectors;
 
 public class CacheFlagEventsTest
 {
+    private static final Logger LOGGER = JDALogger.getLog(CacheFlagEventsTest.class);
     private static final Pattern LINK_SPLIT_PATTERN = Pattern.compile("(?<!,)\\s+");
     private static final Pattern CACHE_FLAG_REFERENCE_PATTERN = Pattern.compile("CacheFlag#(\\w+)");
 
@@ -38,8 +43,8 @@ public class CacheFlagEventsTest
     ));
 
     private static List<CompilationUnit> compilationUnits;
+    private static Reflections events;
 
-    //TODO Check supertypes for documented flags not present in subtype javadoc
     //TODO Check flags given by #fromEvents not documented
 
     @BeforeAll
@@ -59,56 +64,110 @@ public class CacheFlagEventsTest
                 })
                 .map(r -> r.getResult().get())
                 .collect(Collectors.toList());
+
+        events = new Reflections("net.dv8tion.jda.api.events");
     }
 
     @Test
     public void testDocumentedFlags() throws Exception
     {
         // Check for documented flags retrieved with #fromEvents
-        for (CompilationUnit unit : compilationUnits)
+        for (TypeDeclaration<?> typeDeclaration : compilationUnits.stream().flatMap(c -> c.findAll(TypeDeclaration.class).stream()).collect(Collectors.toList()))
         {
-            final TypeDeclaration<?> primaryType = unit.getPrimaryType().orElse(null);
-            if (primaryType == null)
+            final String qualifiedEventName = typeDeclaration.getFullyQualifiedName().orElseThrow(AssertionError::new);
+            if (IGNORED_CLASSES.contains(qualifiedEventName))
                 continue;
 
-            final JavadocDescription description = primaryType
+            final JavadocDescription description = typeDeclaration
                     .getJavadoc()
                     .map(Javadoc::getDescription)
                     .orElse(null);
             if (description == null)
                 continue;
 
-            final List<String> links = description.getElements().stream()
-                    .filter(e -> e instanceof JavadocInlineTag)
-                    .map(JavadocInlineTag.class::cast)
-                    .filter(tag -> tag.getType() == JavadocInlineTag.Type.LINK)
-                    .map(JavadocInlineTag::getContent)
-                    .map(String::trim)
-                    .map(s -> LINK_SPLIT_PATTERN.split(s, 2)[0]) //Take left part
-                    .collect(Collectors.toList());
-
-            final EnumSet<CacheFlag> expectedFlags = EnumSet.noneOf(CacheFlag.class);
-            for (String link : links)
-            {
-                final Matcher matcher = CACHE_FLAG_REFERENCE_PATTERN.matcher(link);
-                while (matcher.find())
-                {
-                    final String flagName = matcher.group(1);
-                    final CacheFlag expectedFlag = CacheFlag.valueOf(flagName);
-                    expectedFlags.add(expectedFlag);
-                }
-            }
+            final List<String> links = getLinks(description);
+            final EnumSet<CacheFlag> expectedFlags = mapLinks(CacheFlag.class, links, CACHE_FLAG_REFERENCE_PATTERN);
 
             if (expectedFlags.isEmpty()) continue;
-
-            final String qualifiedEventName = primaryType.getFullyQualifiedName().orElseThrow(AssertionError::new);
-            if (IGNORED_CLASSES.contains(qualifiedEventName))
-                continue;
 
             @SuppressWarnings("unchecked")
             final Class<? extends GenericEvent> eventClass = (Class<? extends GenericEvent>) Class.forName(qualifiedEventName);
 
-            Assertions.assertEquals(expectedFlags, CacheFlag.fromEvents(eventClass), "Documented flags in " + primaryType.getNameAsString() + " are not returned by #fromEvents");
+            Assertions.assertEquals(expectedFlags, CacheFlag.fromEvents(eventClass), "Documented flags in " + typeDeclaration.getNameAsString() + " are not returned by #fromEvents");
         }
+    }
+
+    @Test
+    public void testInheritedFlags() throws Exception
+    {
+        // Check that documented flags appear in subtypes
+        // First find what flags each class uses
+        final Map<Class<?>, EnumSet<CacheFlag>> flagsByQualifiedName = new HashMap<>();
+        for (TypeDeclaration<?> typeDeclaration : compilationUnits.stream().flatMap(c -> c.findAll(TypeDeclaration.class).stream()).collect(Collectors.toList()))
+        {
+            final String qualifiedEventName = typeDeclaration.getFullyQualifiedName().orElseThrow(AssertionError::new);
+
+            final JavadocDescription description = typeDeclaration
+                    .getJavadoc()
+                    .map(Javadoc::getDescription)
+                    .orElse(null);
+            if (description == null)
+            {
+                LOGGER.warn("Undocumented class at {}", qualifiedEventName);
+                continue;
+            }
+
+            final List<String> links = getLinks(description);
+            final EnumSet<CacheFlag> expectedFlags = mapLinks(CacheFlag.class, links, CACHE_FLAG_REFERENCE_PATTERN);
+            flagsByQualifiedName.put(Class.forName(qualifiedEventName), expectedFlags);
+        }
+
+        // Then find subtypes of events and check the map
+        for (Class<?> eventClass : flagsByQualifiedName.keySet())
+        {
+            final EnumSet<CacheFlag> typeFlags = flagsByQualifiedName.get(eventClass);
+            @SuppressWarnings("unchecked")
+            final Set<Class<? extends GenericEvent>> subtypes = events.getSubTypesOf(((Class<GenericEvent>) eventClass));
+            for (Class<? extends GenericEvent> subtype : subtypes)
+            {
+                final EnumSet<CacheFlag> subtypeFlags = flagsByQualifiedName.get(subtype);
+                if (subtypeFlags == null)
+                    continue;
+
+                final EnumSet<CacheFlag> missingFlags = EnumSet.copyOf(typeFlags);
+                missingFlags.removeAll(subtypeFlags);
+
+                Assertions.assertTrue(missingFlags.isEmpty(), subtype.getSimpleName() + " does not document " + missingFlags + " inherited from " + eventClass.getSimpleName());
+            }
+        }
+    }
+
+    @Nonnull
+    private static List<String> getLinks(JavadocDescription description)
+    {
+        return description.getElements().stream()
+                .filter(e -> e instanceof JavadocInlineTag)
+                .map(JavadocInlineTag.class::cast)
+                .filter(tag -> tag.getType() == JavadocInlineTag.Type.LINK)
+                .map(JavadocInlineTag::getContent)
+                .map(String::trim)
+                .map(s -> LINK_SPLIT_PATTERN.split(s, 2)[0]) //Take left part
+                .collect(Collectors.toList());
+    }
+
+    @Nonnull
+    private static <E extends Enum<E>> EnumSet<E> mapLinks(Class<E> type, List<String> links, Pattern pattern)
+    {
+        final EnumSet<E> enumSet = EnumSet.noneOf(type);
+        for (String link : links)
+        {
+            final Matcher matcher = pattern.matcher(link);
+            while (matcher.find())
+            {
+                final String elementName = matcher.group(1);
+                enumSet.add(Enum.valueOf(type, elementName));
+            }
+        }
+        return enumSet;
     }
 }
