@@ -21,10 +21,23 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.attribute.IPostContainer;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.events.GenericEvent;
+import net.dv8tion.jda.api.events.channel.forum.GenericForumTagEvent;
+import net.dv8tion.jda.api.events.emoji.GenericEmojiEvent;
+import net.dv8tion.jda.api.events.guild.scheduledevent.GenericScheduledEventGatewayEvent;
+import net.dv8tion.jda.api.events.guild.voice.GenericGuildVoiceEvent;
+import net.dv8tion.jda.api.events.sticker.GenericGuildStickerEvent;
+import net.dv8tion.jda.api.events.user.UserActivityEndEvent;
+import net.dv8tion.jda.api.events.user.UserActivityStartEvent;
+import net.dv8tion.jda.api.events.user.update.UserUpdateActivitiesEvent;
+import net.dv8tion.jda.api.events.user.update.UserUpdateOnlineStatusEvent;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.internal.utils.Checks;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
 
 /**
@@ -136,5 +149,62 @@ public enum CacheFlag
     public static EnumSet<CacheFlag> getPrivileged()
     {
         return EnumSet.copyOf(privileged);
+    }
+
+    /**
+     * Parse the required cache flags from the provided {@link GenericEvent Event Types}.
+     *
+     * @param  events
+     *         The event types
+     *
+     * @throws IllegalArgumentException
+     *         If provided with null
+     *
+     * @return {@link EnumSet} for the required cache flags
+     */
+    @Nonnull
+    @SafeVarargs
+    public static EnumSet<CacheFlag> fromEvents(@Nonnull Class<? extends GenericEvent>... events)
+    {
+        Checks.noneNull(events, "Event");
+        return fromEvents(Arrays.asList(events));
+    }
+
+    /**
+     * Parse the required cache flags from the provided {@link GenericEvent Event Types}.
+     *
+     * @param  events
+     *         The event types
+     *
+     * @throws IllegalArgumentException
+     *         If provided with null
+     *
+     * @return {@link EnumSet} for the required cache flags
+     */
+    @Nonnull
+    public static EnumSet<CacheFlag> fromEvents(@Nonnull Collection<Class<? extends GenericEvent>> events)
+    {
+        Checks.noneNull(events, "Events");
+        EnumSet<CacheFlag> flags = EnumSet.noneOf(CacheFlag.class);
+        for (Class<? extends GenericEvent> event : events)
+        {
+            if (GenericForumTagEvent.class.isAssignableFrom(event))
+                flags.add(FORUM_TAGS);
+            else if (GenericEmojiEvent.class.isAssignableFrom(event))
+                flags.add(EMOJI);
+            else if (GenericScheduledEventGatewayEvent.class.isAssignableFrom(event))
+                flags.add(SCHEDULED_EVENTS);
+            else if (GenericGuildVoiceEvent.class.isAssignableFrom(event))
+                flags.add(VOICE_STATE);
+            else if (GenericGuildStickerEvent.class.isAssignableFrom(event))
+                flags.add(STICKER);
+            else if (UserActivityStartEvent.class.isAssignableFrom(event) || UserActivityEndEvent.class.isAssignableFrom(event))
+                flags.add(ACTIVITY);
+            else if (UserUpdateActivitiesEvent.class.isAssignableFrom(event))
+                flags.add(ACTIVITY);
+            else if (UserUpdateOnlineStatusEvent.class.isAssignableFrom(event))
+                flags.add(ONLINE_STATUS);
+        }
+        return flags;
     }
 }
