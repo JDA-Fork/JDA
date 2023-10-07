@@ -24,7 +24,10 @@ import org.slf4j.Logger;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -34,12 +37,13 @@ public class CacheFlagRequirementsTest
     private static final Logger LOGGER = JDALogger.getLog(CacheFlagRequirementsTest.class);
     private static final Pattern LINK_SPLIT_PATTERN = Pattern.compile("(?<!,)\\s+");
 
-    private static final Set<Class<? extends GenericEvent>> IGNORED_CLASSES = new HashSet<>(Arrays.asList(
-            PermissionOverrideCreateEvent.class,
-            PermissionOverrideUpdateEvent.class,
-            PermissionOverrideDeleteEvent.class,
-            GenericPermissionOverrideEvent.class
-    ));
+    // Classes which have documented intents, but are optional, and thus not given by #fromEvents
+    private static final Map<Class<? extends GenericEvent>, EnumSet<CacheFlag>> OPTIONAL_FLAGS = new HashMap<Class<? extends GenericEvent>, EnumSet<CacheFlag>>() {{
+        put(PermissionOverrideCreateEvent.class, EnumSet.of(CacheFlag.MEMBER_OVERRIDES));
+        put(PermissionOverrideUpdateEvent.class, EnumSet.of(CacheFlag.MEMBER_OVERRIDES));
+        put(PermissionOverrideDeleteEvent.class, EnumSet.of(CacheFlag.MEMBER_OVERRIDES));
+        put(GenericPermissionOverrideEvent.class, EnumSet.of(CacheFlag.MEMBER_OVERRIDES));
+    }};
 
     private static Reflections events;
     private static Map<Class<GenericEvent>, EnumSet<CacheFlag>> flagsByClass;
@@ -137,10 +141,8 @@ public class CacheFlagRequirementsTest
         // Check that #fromEvents gives the same flags that are documented
         for (Class<GenericEvent> eventClass : flagsByClass.keySet())
         {
-            if (IGNORED_CLASSES.contains(eventClass))
-                continue;
-
             final EnumSet<CacheFlag> documentedFlags = flagsByClass.get(eventClass);
+            documentedFlags.removeAll(OPTIONAL_FLAGS.getOrDefault(eventClass, EnumSet.noneOf(CacheFlag.class)));
             final EnumSet<CacheFlag> requiredFlags = CacheFlag.fromEvents(eventClass);
 
             Assertions.assertEquals(
