@@ -20,6 +20,7 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.PermissionOverride;
 import net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 import java.util.EnumSet;
@@ -28,6 +29,12 @@ import java.util.EnumSet;
  * Indicates that a {@link PermissionOverride} in a {@link IPermissionContainer guild channel} has been updated.
  *
  * <p>Can be used to retrieve the updated override and old {@link #getOldAllow() allow} and {@link #getOldDeny() deny}.
+ *
+ * <p><b>Requirements</b><br>
+ *
+ * <p>These events require {@link CacheFlag#MEMBER_OVERRIDES} to be enabled for member overrides,
+ * except if the member is the {@link net.dv8tion.jda.api.entities.Guild#getSelfMember() self member}.
+ * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disable this by default!
  */
 //TODO-v5: Should this be implementing UpdateEvent?
 public class PermissionOverrideUpdateEvent extends GenericPermissionOverrideEvent
