@@ -33,7 +33,6 @@ public class CacheFlagEventsTest
 {
     private static final Logger LOGGER = JDALogger.getLog(CacheFlagEventsTest.class);
     private static final Pattern LINK_SPLIT_PATTERN = Pattern.compile("(?<!,)\\s+");
-    private static final Pattern CACHE_FLAG_REFERENCE_PATTERN = Pattern.compile("CacheFlag#(\\w+)");
 
     private static final Set<String> IGNORED_CLASSES = new HashSet<>(Arrays.asList(
             PermissionOverrideCreateEvent.class.getName(),
@@ -42,17 +41,15 @@ public class CacheFlagEventsTest
             GenericPermissionOverrideEvent.class.getName()
     ));
 
-    private static List<CompilationUnit> compilationUnits;
     private static Reflections events;
-
-    //TODO Check flags given by #fromEvents not documented
+    private static Map<Class<GenericEvent>, EnumSet<CacheFlag>> flagsByClass;
 
     @BeforeAll
-    static void setup() throws IOException
+    static void setup() throws IOException, ClassNotFoundException
     {
         final SourceRoot root = new SourceRoot(Paths.get("src", "main", "java"));
         final List<ParseResult<CompilationUnit>> parseResults = root.tryToParse(Event.class.getPackage().getName());
-        compilationUnits = parseResults.stream()
+        List<CompilationUnit> compilationUnits = parseResults.stream()
                 .filter(p ->
                 {
                     if (!p.getProblems().isEmpty())
@@ -65,15 +62,18 @@ public class CacheFlagEventsTest
                 .map(r -> r.getResult().get())
                 .collect(Collectors.toList());
 
+        flagsByClass = getEnumEntriesByClass(CacheFlag.class, compilationUnits);
+
         events = new Reflections("net.dv8tion.jda.api.events");
     }
 
-    @Test
-    public void testFlagMismatches() throws Exception
+    @SuppressWarnings("unchecked")
+    public static <E extends Enum<E>> Map<Class<GenericEvent>, EnumSet<E>> getEnumEntriesByClass(Class<E> enumType, List<CompilationUnit> compilationUnits) throws ClassNotFoundException
     {
-        // Check that #fromEvents gives the same flags that are documented
-        // First find what flags each class uses
-        final Map<Class<GenericEvent>, EnumSet<CacheFlag>> flagsByClass = new HashMap<>();
+        final Pattern enumEntryReferencePattern = Pattern.compile(Pattern.quote(enumType.getSimpleName()) + "#(\\w+)");
+        final Map<Class<GenericEvent>, EnumSet<E>> enumEntriesByClass = new HashMap<>();
+
+        // Read documented cache flags of scanned classes
         for (TypeDeclaration<?> typeDeclaration : compilationUnits.stream().flatMap(c -> c.findAll(TypeDeclaration.class).stream()).collect(Collectors.toList()))
         {
             final String qualifiedEventName = typeDeclaration.getFullyQualifiedName().orElseThrow(AssertionError::new);
@@ -89,70 +89,11 @@ public class CacheFlagEventsTest
             }
 
             final List<String> links = getLinks(description);
-            final EnumSet<CacheFlag> expectedFlags = mapLinks(CacheFlag.class, links, CACHE_FLAG_REFERENCE_PATTERN);
-            flagsByClass.put((Class<GenericEvent>) Class.forName(qualifiedEventName), expectedFlags);
+            final EnumSet<E> expectedFlags = mapLinks(enumType, links, enumEntryReferencePattern);
+            enumEntriesByClass.put((Class<GenericEvent>) Class.forName(qualifiedEventName), expectedFlags);
         }
 
-        // Then find subtypes of events and check the map
-        for (Class<GenericEvent> eventClass : flagsByClass.keySet())
-        {
-            if (IGNORED_CLASSES.contains(eventClass.getName()))
-                continue;
-
-            final EnumSet<CacheFlag> documentedFlags = flagsByClass.get(eventClass);
-            final EnumSet<CacheFlag> requiredFlags = CacheFlag.fromEvents(eventClass);
-
-            Assertions.assertEquals(
-                    documentedFlags,
-                    requiredFlags,
-                    "Documented flags from " + eventClass.getSimpleName() + " " + documentedFlags + " does not correspond to flags given by #fromEvents: " + requiredFlags
-            );
-        }
-    }
-
-    @Test
-    public void testInheritedFlags() throws Exception
-    {
-        // Check that documented flags appear in subtypes
-        // First find what flags each class uses
-        final Map<Class<?>, EnumSet<CacheFlag>> flagsByQualifiedName = new HashMap<>();
-        for (TypeDeclaration<?> typeDeclaration : compilationUnits.stream().flatMap(c -> c.findAll(TypeDeclaration.class).stream()).collect(Collectors.toList()))
-        {
-            final String qualifiedEventName = typeDeclaration.getFullyQualifiedName().orElseThrow(AssertionError::new);
-
-            final JavadocDescription description = typeDeclaration
-                    .getJavadoc()
-                    .map(Javadoc::getDescription)
-                    .orElse(null);
-            if (description == null)
-            {
-                LOGGER.warn("Undocumented class at {}", qualifiedEventName);
-                continue;
-            }
-
-            final List<String> links = getLinks(description);
-            final EnumSet<CacheFlag> expectedFlags = mapLinks(CacheFlag.class, links, CACHE_FLAG_REFERENCE_PATTERN);
-            flagsByQualifiedName.put(Class.forName(qualifiedEventName), expectedFlags);
-        }
-
-        // Then find subtypes of events and check the map
-        for (Class<?> eventClass : flagsByQualifiedName.keySet())
-        {
-            final EnumSet<CacheFlag> typeFlags = flagsByQualifiedName.get(eventClass);
-            @SuppressWarnings("unchecked")
-            final Set<Class<? extends GenericEvent>> subtypes = events.getSubTypesOf(((Class<GenericEvent>) eventClass));
-            for (Class<? extends GenericEvent> subtype : subtypes)
-            {
-                final EnumSet<CacheFlag> subtypeFlags = flagsByQualifiedName.get(subtype);
-                if (subtypeFlags == null)
-                    continue;
-
-                final EnumSet<CacheFlag> missingFlags = EnumSet.copyOf(typeFlags);
-                missingFlags.removeAll(subtypeFlags);
-
-                Assertions.assertTrue(missingFlags.isEmpty(), subtype.getSimpleName() + " does not document " + missingFlags + " inherited from " + eventClass.getSimpleName());
-            }
-        }
+        return enumEntriesByClass;
     }
 
     @Nonnull
@@ -182,5 +123,46 @@ public class CacheFlagEventsTest
             }
         }
         return enumSet;
+    }
+
+    @Test
+    public void testFlagMismatches()
+    {
+        // Check that #fromEvents gives the same flags that are documented
+        for (Class<GenericEvent> eventClass : flagsByClass.keySet())
+        {
+            if (IGNORED_CLASSES.contains(eventClass.getName()))
+                continue;
+
+            final EnumSet<CacheFlag> documentedFlags = flagsByClass.get(eventClass);
+            final EnumSet<CacheFlag> requiredFlags = CacheFlag.fromEvents(eventClass);
+
+            Assertions.assertEquals(
+                    documentedFlags,
+                    requiredFlags,
+                    "Documented flags from " + eventClass.getSimpleName() + " " + documentedFlags + " does not correspond to flags given by #fromEvents: " + requiredFlags
+            );
+        }
+    }
+
+    @Test
+    public void testInheritedFlags()
+    {
+        // Check that documented flags appear in subtypes
+        for (Class<GenericEvent> eventClass : flagsByClass.keySet())
+        {
+            final EnumSet<CacheFlag> typeFlags = flagsByClass.get(eventClass);
+            for (Class<? extends GenericEvent> subtype : events.getSubTypesOf(eventClass))
+            {
+                final EnumSet<CacheFlag> subtypeFlags = flagsByClass.get(subtype);
+                if (subtypeFlags == null)
+                    continue;
+
+                final EnumSet<CacheFlag> missingFlags = EnumSet.copyOf(typeFlags);
+                missingFlags.removeAll(subtypeFlags);
+
+                Assertions.assertTrue(missingFlags.isEmpty(), subtype.getSimpleName() + " does not document " + missingFlags + " inherited from " + eventClass.getSimpleName());
+            }
+        }
     }
 }
