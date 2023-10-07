@@ -29,7 +29,7 @@ public class GatewayIntentRequirementsTest
             MessageReactionRemoveEvent.class, // Does not require messages
             MessageReactionAddEvent.class // Does not require messages
     ));
-    // Classes which have document intents, but are optional, and thus not given by #fromEvents
+    // Classes which have documented intents, but are optional, and thus not given by #fromEvents
     private static final Map<Class<? extends GenericEvent>, EnumSet<GatewayIntent>> OPTIONAL_INTENTS = new HashMap<Class<? extends GenericEvent>, EnumSet<GatewayIntent>>() {{
         put(AutoModExecutionEvent.class, EnumSet.of(GatewayIntent.MESSAGE_CONTENT));
     }};
