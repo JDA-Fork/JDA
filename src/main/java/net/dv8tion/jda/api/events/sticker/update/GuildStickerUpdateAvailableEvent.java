@@ -19,9 +19,6 @@ package net.dv8tion.jda.api.events.sticker.update;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.sticker.GuildSticker;
-import net.dv8tion.jda.api.events.annotations.Requirements;
-import net.dv8tion.jda.api.requests.GatewayIntent;
-import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 
@@ -37,7 +34,6 @@ import javax.annotation.Nonnull;
  *
  * <p>Identifier: {@code available}
  */
-@Requirements(intents = GatewayIntent.GUILD_EMOJIS_AND_STICKERS, cache = CacheFlag.STICKER)
 public class GuildStickerUpdateAvailableEvent extends GenericGuildStickerUpdateEvent<Boolean>
 {
     public static final String IDENTIFIER = "available";

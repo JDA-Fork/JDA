@@ -19,8 +19,6 @@ package net.dv8tion.jda.api.events.channel.forum.update;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.channel.attribute.IPostContainer;
 import net.dv8tion.jda.api.entities.channel.forums.ForumTag;
-import net.dv8tion.jda.api.events.annotations.Requirements;
-import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -34,7 +32,6 @@ import java.util.Collection;
  *
  * <p>Identifier: {@code moderated}
  */
-@Requirements(cache = CacheFlag.FORUM_TAGS)
 @SuppressWarnings("ConstantConditions")
 public class ForumTagUpdateModeratedEvent extends GenericForumTagUpdateEvent<Boolean>
 {

@@ -21,8 +21,6 @@ import net.dv8tion.jda.api.entities.channel.attribute.IPostContainer;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.entities.channel.forums.ForumTag;
 import net.dv8tion.jda.api.events.Event;
-import net.dv8tion.jda.api.events.annotations.Requirements;
-import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -34,7 +32,6 @@ import java.util.Collection;
  * This requires {@link net.dv8tion.jda.api.utils.cache.CacheFlag#FORUM_TAGS CacheFlag.FORUM_TAGS} to be enabled.
  * {@link net.dv8tion.jda.api.JDABuilder#createLight(String, Collection) JDABuilder.createLight(...)} disables this by default.
  */
-@Requirements(cache = CacheFlag.FORUM_TAGS)
 public abstract class GenericForumTagEvent extends Event
 {
     protected final IPostContainer channel;

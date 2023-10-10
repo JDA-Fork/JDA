@@ -17,8 +17,6 @@ package net.dv8tion.jda.api.events.guild.scheduledevent.update;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.ScheduledEvent;
-import net.dv8tion.jda.api.events.annotations.Requirements;
-import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
@@ -40,7 +38,6 @@ import javax.annotation.Nullable;
  * {@link ScheduledEvent ScheduledEvent} was updated and gives us the updated {@link ScheduledEvent ScheduledEvent} object.
  * In order to fire a specific event like this we need to have the old {@link ScheduledEvent ScheduledEvent} cached to compare against.
  */
-@Requirements(intents = GatewayIntent.SCHEDULED_EVENTS, cache = CacheFlag.SCHEDULED_EVENTS)
 public class ScheduledEventUpdateDescriptionEvent extends GenericScheduledEventUpdateEvent<String>
 {
     public static final String IDENTIFIER = "description";

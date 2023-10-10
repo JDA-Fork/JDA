@@ -21,10 +21,6 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.events.UpdateEvent;
-import net.dv8tion.jda.api.events.annotations.Requirements;
-import net.dv8tion.jda.api.events.annotations.RequiresCachedMember;
-import net.dv8tion.jda.api.requests.GatewayIntent;
-import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -63,8 +59,6 @@ import javax.annotation.Nullable;
  *
  * <p>Identifier: {@code audio-channel}
  */
-@Requirements(intents = GatewayIntent.GUILD_VOICE_STATES, cache = CacheFlag.VOICE_STATE)
-@RequiresCachedMember
 public class GuildVoiceUpdateEvent extends GenericGuildVoiceEvent implements UpdateEvent<Member, AudioChannel>
 {
     public static final String IDENTIFIER = "audio-channel";
