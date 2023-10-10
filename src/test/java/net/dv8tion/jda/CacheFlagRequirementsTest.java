@@ -26,7 +26,7 @@ import com.github.javaparser.javadoc.description.JavadocInlineTag;
 import com.github.javaparser.utils.SourceRoot;
 import net.dv8tion.jda.api.events.Event;
 import net.dv8tion.jda.api.events.GenericEvent;
-import net.dv8tion.jda.api.events.annotations.Requirements;
+import net.dv8tion.jda.api.events.annotations.RequiresCachedMember;
 import net.dv8tion.jda.api.events.guild.override.GenericPermissionOverrideEvent;
 import net.dv8tion.jda.api.events.guild.override.PermissionOverrideCreateEvent;
 import net.dv8tion.jda.api.events.guild.override.PermissionOverrideDeleteEvent;
@@ -92,7 +92,7 @@ public class CacheFlagRequirementsTest
                 })
                 .map(r -> r.getResult().get())
                 // Exclude annotations
-                .filter(c -> !c.getPackageDeclaration().map(PackageDeclaration::getNameAsString).equals(Optional.of(Requirements.class.getPackage().getName())))
+                .filter(c -> !c.getPackageDeclaration().map(PackageDeclaration::getNameAsString).equals(Optional.of(RequiresCachedMember.class.getPackage().getName())))
                 .collect(Collectors.toList());
     }
 

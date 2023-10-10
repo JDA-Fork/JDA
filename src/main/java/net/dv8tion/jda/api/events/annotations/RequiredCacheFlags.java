@@ -16,7 +16,6 @@
 
 package net.dv8tion.jda.api.events.annotations;
 
-import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import java.lang.annotation.*;
@@ -25,13 +24,9 @@ import java.lang.annotation.*;
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-public @interface Requirements
+public @interface RequiredCacheFlags
 {
-    GatewayIntent[] intents() default {};
+    CacheFlag[] always() default {};
 
-    GatewayIntent[] optionalIntents() default {};
-
-    CacheFlag[] cache() default {};
-
-    CacheFlag[] optionalCache() default {};
+    CacheFlag[] sometimes() default {};
 }

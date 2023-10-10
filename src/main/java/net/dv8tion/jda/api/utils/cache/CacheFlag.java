@@ -22,7 +22,7 @@ import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.attribute.IPostContainer;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.events.GenericEvent;
-import net.dv8tion.jda.api.events.annotations.Requirements;
+import net.dv8tion.jda.api.events.annotations.RequiredCacheFlags;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.internal.utils.Checks;
 
@@ -181,9 +181,9 @@ public enum CacheFlag
         EnumSet<CacheFlag> flags = EnumSet.noneOf(CacheFlag.class);
         for (Class<? extends GenericEvent> event : events)
         {
-            final Requirements requirements = event.getDeclaredAnnotation(Requirements.class);
-            if (requirements != null)
-                Collections.addAll(flags, requirements.cache());
+            final RequiredCacheFlags requiredCacheFlags = event.getDeclaredAnnotation(RequiredCacheFlags.class);
+            if (requiredCacheFlags != null)
+                Collections.addAll(flags, requiredCacheFlags.always());
         }
         return flags;
     }
