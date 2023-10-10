@@ -425,13 +425,12 @@ public enum GatewayIntent
             else if (GenericMessageReactionEvent.class.isAssignableFrom(event))
                 Collections.addAll(intents, GUILD_MESSAGE_REACTIONS, DIRECT_MESSAGE_REACTIONS);
 
-            else if (GenericMessageEvent.class.isAssignableFrom(event))
+            else if (GenericMessageEvent.class.isAssignableFrom(event)) {
                 if (MessageReactionRemoveEmojiEvent.class.isAssignableFrom(event) || MessageReactionRemoveAllEvent.class.isAssignableFrom(event))
                     Collections.addAll(intents, GUILD_MESSAGE_REACTIONS, DIRECT_MESSAGE_REACTIONS);
                 else
                     Collections.addAll(intents, GUILD_MESSAGES, DIRECT_MESSAGES);
-
-            else if (UserTypingEvent.class.isAssignableFrom(event))
+            } else if (UserTypingEvent.class.isAssignableFrom(event))
                 Collections.addAll(intents, GUILD_MESSAGE_TYPING, DIRECT_MESSAGE_TYPING);
 
             else if (AutoModExecutionEvent.class.isAssignableFrom(event))
