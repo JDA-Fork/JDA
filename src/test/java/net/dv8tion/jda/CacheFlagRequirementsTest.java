@@ -128,7 +128,7 @@ public class CacheFlagRequirementsTest
     private static List<String> getLinks(JavadocDescription description)
     {
         return description.getElements().stream()
-                .filter(e -> e instanceof JavadocInlineTag)
+                .filter(JavadocInlineTag.class::isInstance)
                 .map(JavadocInlineTag.class::cast)
                 .filter(tag -> tag.getType() == JavadocInlineTag.Type.LINK)
                 .map(JavadocInlineTag::getContent)
