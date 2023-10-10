@@ -17,7 +17,6 @@
 package net.dv8tion.jda.api.events.guild.override;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.PermissionOverride;
 import net.dv8tion.jda.api.entities.channel.attribute.IPermissionContainer;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
@@ -29,7 +28,7 @@ import javax.annotation.Nonnull;
  *
  * <p>Can be used to retrieve the old override.
  *
- * <p><b>Note:</b> This event will also be fired when the {@link Guild#getPublicRole() @everyone} override
+ * <p><b>Note:</b> This event will also be fired when the {@link net.dv8tion.jda.api.entities.Guild#getPublicRole() @everyone} override
  * previously had allowed/denied permissions, but has been cleared.
  *
  * <p><b>Requirements</b><br>
