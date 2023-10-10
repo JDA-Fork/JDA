@@ -42,7 +42,6 @@ import java.util.EnumSet;
  * unless the member is the {@link net.dv8tion.jda.api.entities.Guild#getSelfMember() self member}.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables this by default!
  */
-//TODO-v5: Should this be implementing UpdateEvent?
 public class PermissionOverrideUpdateEvent extends GenericPermissionOverrideEvent
 {
     private final long oldAllow, oldDeny;
