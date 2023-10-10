@@ -79,6 +79,8 @@ public class CacheFlagRequirementsTest
     {
         final SourceRoot root = new SourceRoot(Paths.get("src", "main", "java"));
         final List<ParseResult<CompilationUnit>> parseResults = root.tryToParse(Event.class.getPackage().getName());
+        if (parseResults.isEmpty())
+            throw new AssertionError("Could not find any source file");
         return parseResults.stream()
                 .filter(p ->
                 {
