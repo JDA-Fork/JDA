@@ -18,6 +18,7 @@ package net.dv8tion.jda;
 
 import com.github.javaparser.ParseResult;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.description.JavadocDescription;
@@ -25,6 +26,7 @@ import com.github.javaparser.javadoc.description.JavadocInlineTag;
 import com.github.javaparser.utils.SourceRoot;
 import net.dv8tion.jda.api.events.Event;
 import net.dv8tion.jda.api.events.GenericEvent;
+import net.dv8tion.jda.api.events.annotations.Requirements;
 import net.dv8tion.jda.api.events.guild.override.GenericPermissionOverrideEvent;
 import net.dv8tion.jda.api.events.guild.override.PermissionOverrideCreateEvent;
 import net.dv8tion.jda.api.events.guild.override.PermissionOverrideDeleteEvent;
@@ -40,10 +42,7 @@ import org.slf4j.Logger;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -92,6 +91,8 @@ public class CacheFlagRequirementsTest
                     return p.getResult().isPresent();
                 })
                 .map(r -> r.getResult().get())
+                // Exclude annotations
+                .filter(c -> !c.getPackageDeclaration().map(PackageDeclaration::getNameAsString).equals(Optional.of(Requirements.class.getPackage().getName())))
                 .collect(Collectors.toList());
     }
 

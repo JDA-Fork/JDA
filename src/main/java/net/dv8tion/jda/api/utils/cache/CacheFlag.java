@@ -22,15 +22,7 @@ import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.attribute.IPostContainer;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.events.GenericEvent;
-import net.dv8tion.jda.api.events.channel.forum.GenericForumTagEvent;
-import net.dv8tion.jda.api.events.emoji.GenericEmojiEvent;
-import net.dv8tion.jda.api.events.guild.scheduledevent.GenericScheduledEventGatewayEvent;
-import net.dv8tion.jda.api.events.guild.voice.GenericGuildVoiceEvent;
-import net.dv8tion.jda.api.events.sticker.GenericGuildStickerEvent;
-import net.dv8tion.jda.api.events.user.UserActivityEndEvent;
-import net.dv8tion.jda.api.events.user.UserActivityStartEvent;
-import net.dv8tion.jda.api.events.user.update.UserUpdateActivitiesEvent;
-import net.dv8tion.jda.api.events.user.update.UserUpdateOnlineStatusEvent;
+import net.dv8tion.jda.api.events.annotations.Requirements;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.internal.utils.Checks;
 
@@ -38,6 +30,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 
 /**
@@ -188,22 +181,9 @@ public enum CacheFlag
         EnumSet<CacheFlag> flags = EnumSet.noneOf(CacheFlag.class);
         for (Class<? extends GenericEvent> event : events)
         {
-            if (GenericForumTagEvent.class.isAssignableFrom(event))
-                flags.add(FORUM_TAGS);
-            else if (GenericEmojiEvent.class.isAssignableFrom(event))
-                flags.add(EMOJI);
-            else if (GenericScheduledEventGatewayEvent.class.isAssignableFrom(event))
-                flags.add(SCHEDULED_EVENTS);
-            else if (GenericGuildVoiceEvent.class.isAssignableFrom(event))
-                flags.add(VOICE_STATE);
-            else if (GenericGuildStickerEvent.class.isAssignableFrom(event))
-                flags.add(STICKER);
-            else if (UserActivityStartEvent.class.isAssignableFrom(event) || UserActivityEndEvent.class.isAssignableFrom(event))
-                flags.add(ACTIVITY);
-            else if (UserUpdateActivitiesEvent.class.isAssignableFrom(event))
-                flags.add(ACTIVITY);
-            else if (UserUpdateOnlineStatusEvent.class.isAssignableFrom(event))
-                flags.add(ONLINE_STATUS);
+            final Requirements requirements = event.getDeclaredAnnotation(Requirements.class);
+            if (requirements != null)
+                Collections.addAll(flags, requirements.cache());
         }
         return flags;
     }

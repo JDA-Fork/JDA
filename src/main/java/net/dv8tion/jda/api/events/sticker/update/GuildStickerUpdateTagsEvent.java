@@ -19,6 +19,9 @@ package net.dv8tion.jda.api.events.sticker.update;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.sticker.GuildSticker;
+import net.dv8tion.jda.api.events.annotations.Requirements;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 import java.util.Set;
@@ -37,6 +40,7 @@ import java.util.Set;
  *
  * <p>Identifier: {@code tags}
  */
+@Requirements(intents = GatewayIntent.GUILD_EMOJIS_AND_STICKERS, cache = CacheFlag.STICKER)
 public class GuildStickerUpdateTagsEvent extends GenericGuildStickerUpdateEvent<Set<String>>
 {
     public static final String IDENTIFIER = "tags";

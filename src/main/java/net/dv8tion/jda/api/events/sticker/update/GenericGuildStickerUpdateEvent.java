@@ -20,7 +20,10 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.sticker.GuildSticker;
 import net.dv8tion.jda.api.events.UpdateEvent;
+import net.dv8tion.jda.api.events.annotations.Requirements;
 import net.dv8tion.jda.api.events.sticker.GenericGuildStickerEvent;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -35,6 +38,7 @@ import javax.annotation.Nullable;
  *
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables that CacheFlag by default!
  */
+@Requirements(intents = GatewayIntent.GUILD_EMOJIS_AND_STICKERS, cache = CacheFlag.STICKER)
 public abstract class GenericGuildStickerUpdateEvent<T> extends GenericGuildStickerEvent implements UpdateEvent<GuildSticker, T>
 {
     protected final String identifier;

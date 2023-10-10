@@ -17,6 +17,8 @@ package net.dv8tion.jda.api.events.guild.scheduledevent;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.ScheduledEvent;
+import net.dv8tion.jda.api.events.annotations.Requirements;
+import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import javax.annotation.Nonnull;
@@ -32,6 +34,7 @@ import javax.annotation.Nonnull;
  * <p>This event requires the {@link net.dv8tion.jda.api.requests.GatewayIntent#SCHEDULED_EVENTS SCHEDULED_EVENTS} intent and {@link CacheFlag#SCHEDULED_EVENTS} to be enabled.
  * <br>{@link net.dv8tion.jda.api.JDABuilder#createLight(String) createLight(String)} disables this by default!
  */
+@Requirements(intents = GatewayIntent.SCHEDULED_EVENTS, cache = CacheFlag.SCHEDULED_EVENTS)
 public class ScheduledEventUserRemoveEvent extends GenericScheduledEventUserEvent
 {
     public ScheduledEventUserRemoveEvent(@Nonnull JDA api, long responseNumber, @Nonnull ScheduledEvent scheduledEvent, long userId)
