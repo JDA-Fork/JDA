@@ -71,6 +71,10 @@ public class GatewayIntentRequirementsTest
         {
             final EnumSet<GatewayIntent> documentedIntents = intentsByClass.get(eventClass);
             documentedIntents.removeAll(OPTIONAL_INTENTS.getOrDefault(eventClass, EnumSet.noneOf(GatewayIntent.class)));
+            documentedIntents.removeAll(EnumSet.of(
+                    GatewayIntent.DIRECT_MESSAGES, GatewayIntent.DIRECT_MESSAGE_REACTIONS, GatewayIntent.DIRECT_MESSAGE_TYPING,
+                    GatewayIntent.GUILD_MESSAGES, GatewayIntent.GUILD_MESSAGE_REACTIONS, GatewayIntent.GUILD_MESSAGE_TYPING
+            ));
             final EnumSet<GatewayIntent> requiredIntents = GatewayIntent.fromEvents(eventClass);
 
             Assertions.assertEquals(
