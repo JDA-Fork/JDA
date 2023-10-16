@@ -20,13 +20,27 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import java.lang.annotation.*;
 
-//TODO docs
+/**
+ * Annotation used by events and {@link GatewayIntent#fromEvents(Class[])}
+ * to determine which intents are required and/or optional for a given event type.
+ *
+ * @see GatewayIntent#fromEvents(Class[])
+ */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface RequiredIntents
 {
+    /**
+     * Gateway intents required for the annotated event to fire.
+     */
     GatewayIntent[] always() default {};
 
+    /**
+     * Gateway intents which may be required for certain methods of the annotated event,
+     * or which may help fire the event under certain conditions.
+     *
+     * <p>The details should be documented on the annotated event.
+     */
     GatewayIntent[] sometimes() default {};
 }

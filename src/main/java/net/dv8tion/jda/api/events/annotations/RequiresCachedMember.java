@@ -16,9 +16,28 @@
 
 package net.dv8tion.jda.api.events.annotations;
 
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.utils.ChunkingFilter;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
+
 import java.lang.annotation.*;
 
-//TODO docs, explain cache policy, chunking and user actions adding them to the cache
+/**
+ * Annotation used by events, specifying that a cached member is required for the event to fire for said member.
+ *
+ * <p>There are multiple ways a member/user would be cached,
+ * the prerequisite being that the {@link MemberCachePolicy} needs to allow it to be cached first.
+ * <br>Assuming the cache policy allows a member to be cached, the member will be loaded in the cache when:
+ * <ul>
+ *     <li>JDA loads it on startup, using {@link ChunkingFilter}</li>
+ *     <li>It is loaded explicitly, using {@link Guild#retrieveMemberById(long)} for example</li>
+ *     <li>An event from the member is received, such as {@link SlashCommandInteractionEvent} for example</li>
+ * </ul>
+ *
+ * @see MemberCachePolicy
+ * @see ChunkingFilter
+ */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented

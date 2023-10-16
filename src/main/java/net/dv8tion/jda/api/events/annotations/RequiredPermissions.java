@@ -20,13 +20,26 @@ import net.dv8tion.jda.api.Permission;
 
 import java.lang.annotation.*;
 
-//TODO docs
+/**
+ * Annotation used by events to determine which permissions are required and/or optional for a given event type.
+ *
+ * @see Permission
+ */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface RequiredPermissions
 {
+    /**
+     * Permissions required for the annotated event to fire.
+     */
     Permission[] always() default {};
 
+    /**
+     * Permissions which may be required for certain methods of the annotated event,
+     * or which may help fire the event under certain conditions.
+     *
+     * <p>The details should be documented on the annotated event.
+     */
     Permission[] sometimes() default {};
 }
