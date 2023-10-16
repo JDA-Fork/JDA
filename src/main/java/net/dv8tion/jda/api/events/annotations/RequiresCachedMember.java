@@ -28,7 +28,7 @@ import java.lang.annotation.*;
  *
  * <p>There are multiple ways a member/user would be cached,
  * the prerequisite being that the {@link MemberCachePolicy} needs to allow it to be cached first.
- * <br>Assuming the cache policy allows a member to be cached, the member will be loaded in the cache when:
+ * <br>Assuming the cache policy allows a member to be cached, the member will be loaded in the cache when either:
  * <ul>
  *     <li>JDA loads it on startup, using {@link ChunkingFilter}</li>
  *     <li>It is loaded explicitly, using {@link Guild#retrieveMemberById(long)} for example</li>
