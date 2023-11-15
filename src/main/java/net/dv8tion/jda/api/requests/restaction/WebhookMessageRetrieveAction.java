@@ -16,18 +16,12 @@
 
 package net.dv8tion.jda.api.requests.restaction;
 
-import net.dv8tion.jda.api.requests.RestAction;
-import net.dv8tion.jda.api.utils.messages.MessageEditRequest;
+import net.dv8tion.jda.api.entities.Message;
 
 /**
- * Specialized {@link RestAction} used to update an existing message sent by a {@link net.dv8tion.jda.api.entities.Webhook Webhook} or {@link net.dv8tion.jda.api.interactions.InteractionHook InteractionHook}.
- *
- * @param <T>
- *        The type of message that will be returned
- *
- * @see   net.dv8tion.jda.api.interactions.InteractionHook#editOriginal(String)
- * @see   net.dv8tion.jda.api.entities.WebhookClient#editMessageById(long, String)
+ * Request to fetch a message from a webhook.
+ * <br>Optionally, provide a {@link #setThreadId(long) thread id} to retrieve messages from threads.
  */
-public interface WebhookMessageEditAction<T> extends MessageEditRequest<WebhookMessageEditAction<T>>, AbstractWebhookMessageAction<T, WebhookMessageEditAction<T>>
+public interface WebhookMessageRetrieveAction extends AbstractWebhookMessageAction<Message, WebhookMessageRetrieveAction>
 {
 }
