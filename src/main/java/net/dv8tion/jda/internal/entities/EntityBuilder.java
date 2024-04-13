@@ -1991,6 +1991,7 @@ public class EntityBuilder
         {
             DataObject obj = content.getObject("video");
             video = new VideoInfo(obj.getString("url", null),
+                                  obj.getString("proxy_url", null),
                                   obj.getInt("width", -1),
                                   obj.getInt("height", -1));
         }
@@ -2554,6 +2555,21 @@ public class EntityBuilder
         Object oldValue = change.isNull("old_value") ? null : change.get("old_value");
         Object newValue = change.isNull("new_value") ? null : change.get("new_value");
         return new AuditLogChange(oldValue, newValue, key);
+    }
+
+    public Entitlement createEntitlement(DataObject object)
+    {
+        return new EntitlementImpl(
+                object.getUnsignedLong("id"),
+                object.getUnsignedLong("sku_id"),
+                object.getUnsignedLong("application_id"),
+                object.getUnsignedLong("user_id", 0),
+                object.getUnsignedLong("guild_id", 0),
+                Entitlement.EntitlementType.fromKey(object.getInt("type")),
+                object.getBoolean("deleted"),
+                object.getOffsetDateTime("starts_at", null),
+                object.getOffsetDateTime("ends_at", null)
+        );
     }
 
     private Map<String, AuditLogChange> changeToMap(Set<AuditLogChange> changesList)

@@ -40,7 +40,7 @@ plugins {
 }
 
 val javaVersion = JavaVersion.current()
-val versionObj = Version(major = "5", minor = "0", revision = "0", classifier = "beta.20")
+val versionObj = Version(major = "5", minor = "0", revision = "0", classifier = "beta.22")
 val isCI = System.getProperty("BUILD_NUMBER") != null // jenkins
         || System.getenv("BUILD_NUMBER") != null
         || System.getProperty("GIT_COMMIT") != null // jitpack
@@ -135,6 +135,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
     testImplementation("org.reflections:reflections:0.10.2")
     testImplementation("org.mockito:mockito-core:5.8.0")
+    testImplementation("org.assertj:assertj-core:3.25.3")
 }
 
 val compileJava: JavaCompile by tasks
