@@ -1069,6 +1069,8 @@ public interface JDA extends IGuildChannelContainer<Channel>
      *
      * <p><b>This will only check cached users!</b>
      *
+     * <p>To check users without discriminators, use {@code username#0000} instead.
+     *
      * @param  tag
      *         The Discord Tag in the format {@code Username#Discriminator}
      *
@@ -1078,7 +1080,6 @@ public interface JDA extends IGuildChannelContainer<Channel>
      * @return The {@link net.dv8tion.jda.api.entities.User} for the discord tag or null if no user has the provided tag
      */
     @Nullable
-    @Incubating
     default User getUserByTag(@Nonnull String tag)
     {
         Checks.notNull(tag, "Tag");
@@ -1112,16 +1113,13 @@ public interface JDA extends IGuildChannelContainer<Channel>
      * @return The {@link net.dv8tion.jda.api.entities.User} for the discord tag or null if no user has the provided tag
      */
     @Nullable
-    @Incubating
-    default User getUserByTag(@Nonnull String username, @Nonnull String discriminator)
+    default User getUserByTag(@Nonnull String username, @Nullable String discriminator)
     {
-        Checks.notNull(username, "Username");
-        Checks.notNull(discriminator, "Discriminator");
-        Checks.check(discriminator.length() == 4 && Helpers.isNumeric(discriminator), "Invalid format for discriminator!");
-        int codePointLength = Helpers.codePointLength(username);
-        Checks.check(codePointLength >= 2 && codePointLength <= 32, "Username must be between 2 and 32 codepoints in length!");
+        Checks.inRange(username, 2, 32, "Username");
+        Checks.check(discriminator == null || discriminator.length() == 4 && Helpers.isNumeric(discriminator), "Invalid format for discriminator! Provided: %s", discriminator);
+        String actualDiscriminator = discriminator == null ? "0000" : discriminator;
         return getUserCache().applyStream(stream ->
-            stream.filter(it -> it.getDiscriminator().equals(discriminator))
+            stream.filter(it -> it.getDiscriminator().equals(actualDiscriminator))
                   .filter(it -> it.getName().equals(username))
                   .findFirst()
                   .orElse(null)
