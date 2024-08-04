@@ -1214,14 +1214,8 @@ public interface Guild extends IGuildChannelContainer<GuildChannel>, ISnowflake
      * @return The {@link net.dv8tion.jda.api.entities.Member} for the discord tag or null if no member has the provided tag
      *
      * @see    net.dv8tion.jda.api.JDA#getUserByTag(String)
-     *
-     * @deprecated This will become obsolete in the future.
-     *             Discriminators are being phased out and replaced by globally unique usernames.
-     *             For more information, see <a href="https://support.discord.com/hc/en-us/articles/12620128861463" target="_blank">New Usernames &amp; Display Names</a>.
      */
     @Nullable
-    @Deprecated
-    @ForRemoval
     default Member getMemberByTag(@Nonnull String tag)
     {
         User user = getJDA().getUserByTag(tag);
@@ -1254,14 +1248,8 @@ public interface Guild extends IGuildChannelContainer<GuildChannel>, ISnowflake
      * @return The {@link net.dv8tion.jda.api.entities.Member} for the discord tag or null if no member has the provided tag
      *
      * @see    #getMemberByTag(String)
-     *
-     * @deprecated This will become obsolete in the future.
-     *             Discriminators are being phased out and replaced by globally unique usernames.
-     *             For more information, see <a href="https://support.discord.com/hc/en-us/articles/12620128861463" target="_blank">New Usernames &amp; Display Names</a>.
      */
     @Nullable
-    @Deprecated
-    @ForRemoval
     default Member getMemberByTag(@Nonnull String username, @Nonnull String discriminator)
     {
         User user = getJDA().getUserByTag(username, discriminator);
@@ -3277,7 +3265,7 @@ public interface Guild extends IGuildChannelContainer<GuildChannel>, ISnowflake
      * Retrieves a {@link ScheduledEvent} by its ID.
      * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} include:
      * <ul>
-     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#SCHEDULED_EVENT ErrorResponse.UNKNOWN_SCHEDULED_EVENT}
+     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_SCHEDULED_EVENT ErrorResponse.UNKNOWN_SCHEDULED_EVENT}
      *     <br>A scheduled event with the specified ID does not exist in the guild, or the currently logged in user does not
      *     have access to it.</li>
      * </ul>
@@ -3300,7 +3288,7 @@ public interface Guild extends IGuildChannelContainer<GuildChannel>, ISnowflake
      * Retrieves a {@link ScheduledEvent} by its ID.
      * <p>Possible {@link net.dv8tion.jda.api.requests.ErrorResponse ErrorResponses} include:
      * <ul>
-     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#SCHEDULED_EVENT ErrorResponse.UNKNOWN_SCHEDULED_EVENT}
+     *     <li>{@link net.dv8tion.jda.api.requests.ErrorResponse#UNKNOWN_SCHEDULED_EVENT ErrorResponse.UNKNOWN_SCHEDULED_EVENT}
      *     <br>A scheduled event with the specified ID does not exist in this guild, or the currently logged in user does not
      *     have access to it.</li>
      * </ul>
@@ -3722,7 +3710,7 @@ public interface Guild extends IGuildChannelContainer<GuildChannel>, ISnowflake
      */
     @Nonnull
     @CheckReturnValue
-    AuditableRestAction<BulkBanResponse> ban(@Nonnull Collection<UserSnowflake> users, @Nullable Duration deletionTime);
+    AuditableRestAction<BulkBanResponse> ban(@Nonnull Collection<? extends UserSnowflake> users, @Nullable Duration deletionTime);
 
     /**
      * Bans up to 200 of the provided users.
@@ -3763,7 +3751,7 @@ public interface Guild extends IGuildChannelContainer<GuildChannel>, ISnowflake
      */
     @Nonnull
     @CheckReturnValue
-    default AuditableRestAction<BulkBanResponse> ban(@Nonnull Collection<UserSnowflake> users, int deletionTimeframe, @Nonnull TimeUnit unit)
+    default AuditableRestAction<BulkBanResponse> ban(@Nonnull Collection<? extends UserSnowflake> users, int deletionTimeframe, @Nonnull TimeUnit unit)
     {
         Checks.notNull(unit, "TimeUnit");
         return ban(users, Duration.ofSeconds(unit.toSeconds(deletionTimeframe)));

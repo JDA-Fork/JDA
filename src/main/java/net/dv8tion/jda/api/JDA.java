@@ -25,6 +25,7 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
 import net.dv8tion.jda.api.entities.sticker.*;
+import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.hooks.IEventManager;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
@@ -39,6 +40,7 @@ import net.dv8tion.jda.api.requests.restaction.*;
 import net.dv8tion.jda.api.requests.restaction.pagination.EntitlementPaginationAction;
 import net.dv8tion.jda.api.sharding.ShardManager;
 import net.dv8tion.jda.api.utils.MiscUtil;
+import net.dv8tion.jda.api.utils.Once;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import net.dv8tion.jda.api.utils.cache.CacheView;
 import net.dv8tion.jda.api.utils.cache.SnowflakeCacheView;
@@ -606,6 +608,47 @@ public interface JDA extends IGuildChannelContainer<Channel>
     List<Object> getRegisteredListeners();
 
     /**
+     * Returns a reusable builder for a one-time event listener.
+     *
+     * <p>Note that this method only works if the {@link JDABuilder#setEventManager(IEventManager) event manager}
+     * is either the {@link net.dv8tion.jda.api.hooks.InterfacedEventManager InterfacedEventManager}
+     * or {@link net.dv8tion.jda.api.hooks.AnnotatedEventManager AnnotatedEventManager}.
+     * <br>Other implementations can support it as long as they call
+     * {@link net.dv8tion.jda.api.hooks.EventListener#onEvent(GenericEvent) EventListener.onEvent(GenericEvent)}.
+     *
+     * <p><b>Example:</b>
+     *
+     * <p>Listening to a message from a channel and a user, after using a slash command:
+     * <pre>{@code
+     * final Duration timeout = Duration.ofSeconds(5);
+     * event.reply("Reply in " + TimeFormat.RELATIVE.after(timeout) + " if you can!")
+     *         .setEphemeral(true)
+     *         .queue();
+     *
+     * event.getJDA().listenOnce(MessageReceivedEvent.class)
+     *         .filter(messageEvent -> messageEvent.getChannel().getIdLong() == event.getChannel().getIdLong())
+     *         .filter(messageEvent -> messageEvent.getAuthor().getIdLong() == event.getUser().getIdLong())
+     *         .timeout(timeout, () -> {
+     *             event.getHook().editOriginal("Timeout!").queue();
+     *         })
+     *         .subscribe(messageEvent -> {
+     *             event.getHook().editOriginal("You sent: " + messageEvent.getMessage().getContentRaw()).queue();
+     *         });
+     * }</pre>
+     *
+     * @param  eventType
+     *         Type of the event to listen to
+     *
+     * @throws IllegalArgumentException
+     *         If the provided event type is {@code null}
+     *
+     * @return The one-time event listener builder
+     */
+    @Nonnull
+    @CheckReturnValue
+    <E extends GenericEvent> Once.Builder<E> listenOnce(@Nonnull Class<E> eventType);
+
+    /**
      * Retrieves the list of global commands.
      * <br>This list does not include guild commands! Use {@link Guild#retrieveCommands()} for guild commands.
      * <br>This list does not include localization data. Use {@link #retrieveCommands(boolean)} to get localization data
@@ -1026,6 +1069,8 @@ public interface JDA extends IGuildChannelContainer<Channel>
      *
      * <p><b>This will only check cached users!</b>
      *
+     * <p>To check users without discriminators, use {@code username#0000} instead.
+     *
      * @param  tag
      *         The Discord Tag in the format {@code Username#Discriminator}
      *
@@ -1035,7 +1080,6 @@ public interface JDA extends IGuildChannelContainer<Channel>
      * @return The {@link net.dv8tion.jda.api.entities.User} for the discord tag or null if no user has the provided tag
      */
     @Nullable
-    @Incubating
     default User getUserByTag(@Nonnull String tag)
     {
         Checks.notNull(tag, "Tag");
@@ -1069,16 +1113,13 @@ public interface JDA extends IGuildChannelContainer<Channel>
      * @return The {@link net.dv8tion.jda.api.entities.User} for the discord tag or null if no user has the provided tag
      */
     @Nullable
-    @Incubating
-    default User getUserByTag(@Nonnull String username, @Nonnull String discriminator)
+    default User getUserByTag(@Nonnull String username, @Nullable String discriminator)
     {
-        Checks.notNull(username, "Username");
-        Checks.notNull(discriminator, "Discriminator");
-        Checks.check(discriminator.length() == 4 && Helpers.isNumeric(discriminator), "Invalid format for discriminator!");
-        int codePointLength = Helpers.codePointLength(username);
-        Checks.check(codePointLength >= 2 && codePointLength <= 32, "Username must be between 2 and 32 codepoints in length!");
+        Checks.inRange(username, 2, 32, "Username");
+        Checks.check(discriminator == null || discriminator.length() == 4 && Helpers.isNumeric(discriminator), "Invalid format for discriminator! Provided: %s", discriminator);
+        String actualDiscriminator = discriminator == null ? "0000" : discriminator;
         return getUserCache().applyStream(stream ->
-            stream.filter(it -> it.getDiscriminator().equals(discriminator))
+            stream.filter(it -> it.getDiscriminator().equals(actualDiscriminator))
                   .filter(it -> it.getName().equals(username))
                   .findFirst()
                   .orElse(null)
