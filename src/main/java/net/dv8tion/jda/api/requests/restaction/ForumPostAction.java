@@ -16,6 +16,7 @@
 
 package net.dv8tion.jda.api.requests.restaction;
 
+import net.dv8tion.jda.api.entities.channel.attribute.IPostContainer;
 import net.dv8tion.jda.api.entities.channel.concrete.ForumChannel;
 import net.dv8tion.jda.api.entities.channel.forums.ForumPost;
 import net.dv8tion.jda.api.entities.channel.forums.ForumTagSnowflake;
@@ -24,6 +25,7 @@ import net.dv8tion.jda.api.utils.messages.MessageCreateData;
 import net.dv8tion.jda.api.utils.messages.MessageCreateRequest;
 import net.dv8tion.jda.internal.utils.Checks;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,17 +37,17 @@ import java.util.Collection;
  * <p>On success, this provides a {@link ForumPost} object with the {@link ForumPost#getMessage() starter message}
  * and the {@link ForumPost#getThreadChannel() thread channel} of the post.
  *
- * @see net.dv8tion.jda.api.entities.channel.concrete.ForumChannel#createForumPost(String, MessageCreateData)
+ * @see IPostContainer#createForumPost(String, MessageCreateData)
  */
 public interface ForumPostAction extends AbstractThreadCreateAction<ForumPost, ForumPostAction>, MessageCreateRequest<ForumPostAction>, FluentRestAction<ForumPost, ForumPostAction>
 {
     /**
-     * The {@link ForumChannel} to create the post in
+     * The {@link IPostContainer} to create the post in
      *
-     * @return The {@link ForumChannel}
+     * @return The {@link IPostContainer}
      */
     @Nonnull
-    ForumChannel getChannel();
+    IPostContainer getChannel();
 
     /**
      * Configures that tags which should be applied to the new post.
@@ -63,6 +65,7 @@ public interface ForumPostAction extends AbstractThreadCreateAction<ForumPost, F
      * @see    ForumTagSnowflake#fromId(long)
      */
     @Nonnull
+    @CheckReturnValue
     ForumPostAction setTags(@Nonnull Collection<? extends ForumTagSnowflake> tags);
 
     /**
@@ -81,6 +84,7 @@ public interface ForumPostAction extends AbstractThreadCreateAction<ForumPost, F
      * @see    ForumTagSnowflake#fromId(long)
      */
     @Nonnull
+    @CheckReturnValue
     default ForumPostAction setTags(@Nonnull ForumTagSnowflake... tags)
     {
         Checks.noneNull(tags, "Tags");

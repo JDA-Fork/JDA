@@ -17,10 +17,7 @@
 package net.dv8tion.jda.api.interactions;
 
 import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.ISnowflake;
-import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
@@ -29,10 +26,11 @@ import net.dv8tion.jda.api.interactions.callbacks.*;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.interactions.modals.ModalInteraction;
-import net.dv8tion.jda.internal.utils.Helpers;
+import net.dv8tion.jda.internal.utils.ChannelUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
 
 /**
  * Abstract representation for any kind of Discord interaction.
@@ -149,12 +147,32 @@ public interface Interaction extends ISnowflake
 
     /**
      * The channel this interaction happened in.
-     * <br>This is currently never null, but might be nullable in the future.
      *
-     * @return The channel or null if this interaction is not from a channel context
+     * @return The channel or null if the channel is not provided
      */
     @Nullable
     Channel getChannel();
+
+    /**
+     * The ID of the channel this interaction happened in.
+     * <br>This might be 0 if no channel context is provided in future interaction types.
+     *
+     * @return The channel ID, or 0 if no channel context is provided
+     */
+    long getChannelIdLong();
+
+    /**
+     * The ID of the channel this interaction happened in.
+     * <br>This might be null if no channel context is provided in future interaction types.
+     *
+     * @return The channel ID, or null if no channel context is provided
+     */
+    @Nullable
+    default String getChannelId()
+    {
+        long id = getChannelIdLong();
+        return id != 0 ? Long.toUnsignedString(getChannelIdLong()) : null;
+    }
 
     /**
      * The {@link net.dv8tion.jda.api.entities.channel.middleman.GuildChannel} this interaction happened in.
@@ -168,7 +186,7 @@ public interface Interaction extends ISnowflake
     @Nonnull
     default GuildChannel getGuildChannel()
     {
-       return Helpers.safeChannelCast(getChannel(), GuildChannel.class);
+       return ChannelUtil.safeChannelCast(getChannel(), GuildChannel.class);
     }
 
     /**
@@ -183,7 +201,7 @@ public interface Interaction extends ISnowflake
     @Nonnull
     default MessageChannel getMessageChannel()
     {
-        return Helpers.safeChannelCast(getChannel(), MessageChannel.class);
+        return ChannelUtil.safeChannelCast(getChannel(), MessageChannel.class);
     }
 
     /**
@@ -210,6 +228,15 @@ public interface Interaction extends ISnowflake
             throw new IllegalStateException("This interaction did not happen in a guild");
         return getGuild().getLocale();
     }
+
+    /**
+     * Returns the list of {@link Entitlement entitlements} for the current guild and user.
+     * <br>If this interaction is not from a guild, it will only contain entitlements of the user.
+     *
+     * @return The {@link List List} of {@link Entitlement Entitlement}
+     */
+    @Nonnull
+    List<Entitlement> getEntitlements();
 
     /**
      * Returns the {@link net.dv8tion.jda.api.JDA JDA} instance of this interaction

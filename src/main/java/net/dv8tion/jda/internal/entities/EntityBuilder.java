@@ -29,6 +29,7 @@ import net.dv8tion.jda.api.entities.Guild.NotificationLevel;
 import net.dv8tion.jda.api.entities.Guild.Timeout;
 import net.dv8tion.jda.api.entities.Guild.VerificationLevel;
 import net.dv8tion.jda.api.entities.MessageEmbed.*;
+import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.attribute.IThreadContainer;
 import net.dv8tion.jda.api.entities.channel.attribute.IWebhookContainer;
@@ -38,8 +39,11 @@ import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.entities.emoji.EmojiUnion;
 import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
+import net.dv8tion.jda.api.entities.messages.MessagePoll;
+import net.dv8tion.jda.api.entities.messages.MessageSnapshot;
 import net.dv8tion.jda.api.entities.sticker.*;
 import net.dv8tion.jda.api.entities.templates.Template;
 import net.dv8tion.jda.api.entities.templates.TemplateChannel;
@@ -52,6 +56,7 @@ import net.dv8tion.jda.api.events.user.update.*;
 import net.dv8tion.jda.api.exceptions.ParsingException;
 import net.dv8tion.jda.api.interactions.DiscordLocale;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.components.LayoutComponent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import net.dv8tion.jda.api.utils.cache.CacheView;
 import net.dv8tion.jda.api.utils.data.DataArray;
@@ -59,15 +64,19 @@ import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.entities.channel.concrete.*;
 import net.dv8tion.jda.internal.entities.channel.mixin.attribute.IPermissionContainerMixin;
+import net.dv8tion.jda.internal.entities.channel.mixin.attribute.IPostContainerMixin;
 import net.dv8tion.jda.internal.entities.channel.mixin.middleman.AudioChannelMixin;
+import net.dv8tion.jda.internal.entities.emoji.ApplicationEmojiImpl;
 import net.dv8tion.jda.internal.entities.emoji.CustomEmojiImpl;
 import net.dv8tion.jda.internal.entities.emoji.RichCustomEmojiImpl;
 import net.dv8tion.jda.internal.entities.emoji.UnicodeEmojiImpl;
+import net.dv8tion.jda.internal.entities.messages.MessagePollImpl;
 import net.dv8tion.jda.internal.entities.sticker.*;
 import net.dv8tion.jda.internal.handle.EventCache;
 import net.dv8tion.jda.internal.utils.Helpers;
 import net.dv8tion.jda.internal.utils.JDALogger;
 import net.dv8tion.jda.internal.utils.UnlockHook;
+import net.dv8tion.jda.internal.utils.cache.ChannelCacheViewImpl;
 import net.dv8tion.jda.internal.utils.cache.MemberCacheViewImpl;
 import net.dv8tion.jda.internal.utils.cache.SnowflakeCacheViewImpl;
 import net.dv8tion.jda.internal.utils.cache.SortedSnowflakeCacheViewImpl;
@@ -83,6 +92,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -262,8 +272,8 @@ public class EntityBuilder
         final DataArray threadArray = guildJson.getArray("threads");
         final DataArray scheduledEventsArray = guildJson.getArray("guild_scheduled_events");
         final DataArray emojisArray = guildJson.getArray("emojis");
-        final DataArray stickersArray = guildJson.getArray("stickers");
         final DataArray voiceStateArray = guildJson.getArray("voice_states");
+        final Optional<DataArray> stickersArray = guildJson.optArray("stickers");
         final Optional<DataArray> featuresArray = guildJson.optArray("features");
         final Optional<DataArray> presencesArray = guildJson.optArray("presences");
         final long ownerId = guildJson.getUnsignedLong("owner_id", 0L);
@@ -271,6 +281,7 @@ public class EntityBuilder
         final long systemChannelId = guildJson.getUnsignedLong("system_channel_id", 0L);
         final long rulesChannelId = guildJson.getUnsignedLong("rules_channel_id", 0L);
         final long communityUpdatesChannelId = guildJson.getUnsignedLong("public_updates_channel_id", 0L);
+        final long safetyAlertsChannelId = guildJson.getUnsignedLong("safety_alerts_channel_id", 0L);
         final int boostCount = guildJson.getInt("premium_subscription_count", 0);
         final int boostTier = guildJson.getInt("premium_tier", 0);
         final int maxMembers = guildJson.getInt("max_members", 0);
@@ -385,7 +396,7 @@ public class EntityBuilder
 
         createScheduledEventPass(guildObj, scheduledEventsArray);
         createGuildEmojiPass(guildObj, emojisArray);
-        createGuildStickerPass(guildObj, stickersArray);
+        stickersArray.ifPresent(stickers -> createGuildStickerPass(guildObj, stickers));
         guildJson.optArray("stage_instances")
                 .map(arr -> arr.stream(DataArray::getObject))
                 .ifPresent(list -> list.forEach(it -> createStageInstance(guildObj, it)));
@@ -393,36 +404,34 @@ public class EntityBuilder
         guildObj.setAfkChannel(guildObj.getVoiceChannelById(afkChannelId))
                 .setSystemChannel(guildObj.getTextChannelById(systemChannelId))
                 .setRulesChannel(guildObj.getTextChannelById(rulesChannelId))
-                .setCommunityUpdatesChannel(guildObj.getTextChannelById(communityUpdatesChannelId));
+                .setCommunityUpdatesChannel(guildObj.getTextChannelById(communityUpdatesChannelId))
+                .setSafetyAlertsChannel(guildObj.getTextChannelById(safetyAlertsChannelId));
 
         return guildObj;
     }
 
-    private void createGuildChannel(GuildImpl guildObj, DataObject channelData)
+    public GuildChannel createGuildChannel(GuildImpl guildObj, DataObject channelData)
     {
         final ChannelType channelType = ChannelType.fromId(channelData.getInt("type"));
         switch (channelType)
         {
         case TEXT:
-            createTextChannel(guildObj, channelData, guildObj.getIdLong());
-            break;
+            return createTextChannel(guildObj, channelData, guildObj.getIdLong());
         case NEWS:
-            createNewsChannel(guildObj, channelData, guildObj.getIdLong());
-            break;
+            return createNewsChannel(guildObj, channelData, guildObj.getIdLong());
         case STAGE:
-            createStageChannel(guildObj, channelData, guildObj.getIdLong());
-            break;
+            return createStageChannel(guildObj, channelData, guildObj.getIdLong());
         case VOICE:
-            createVoiceChannel(guildObj, channelData, guildObj.getIdLong());
-            break;
+            return createVoiceChannel(guildObj, channelData, guildObj.getIdLong());
         case CATEGORY:
-            createCategory(guildObj, channelData, guildObj.getIdLong());
-            break;
+            return createCategory(guildObj, channelData, guildObj.getIdLong());
         case FORUM:
-            createForumChannel(guildObj, channelData, guildObj.getIdLong());
-            break;
+            return createForumChannel(guildObj, channelData, guildObj.getIdLong());
+        case MEDIA:
+            return createMediaChannel(guildObj, channelData, guildObj.getIdLong());
         default:
             LOG.debug("Cannot create channel for type " + channelData.getInt("type"));
+            return null;
         }
     }
 
@@ -554,9 +563,9 @@ public class EntityBuilder
             GuildVoiceStateImpl voiceState = (GuildVoiceStateImpl) member.getVoiceState();
             if (voiceState != null)
             {
-                VoiceChannelImpl connectedChannel = (VoiceChannelImpl) voiceState.getChannel();
-                if (connectedChannel != null)
-                    connectedChannel.getConnectedMembersMap().remove(member.getIdLong());
+                AudioChannel connectedChannel = voiceState.getChannel();
+                if (connectedChannel instanceof AudioChannelMixin)
+                    ((AudioChannelMixin<?>) connectedChannel).getConnectedMembersMap().remove(member.getIdLong());
                 voiceState.setConnectedChannel(null);
             }
 
@@ -1012,6 +1021,15 @@ public class EntityBuilder
                 .setAvailable(json.getBoolean("available", true));
     }
 
+    public ApplicationEmojiImpl createApplicationEmoji(JDAImpl api, DataObject json, User owner)
+    {
+        final long emojiId = json.getUnsignedLong("id");
+
+        return new ApplicationEmojiImpl(emojiId, api, owner)
+                .setAnimated(json.getBoolean("animated"))
+                .setName(json.getString("name"));
+    }
+
     public ScheduledEvent createScheduledEvent(GuildImpl guild, DataObject json)
     {
         final long id = json.getLong("id");
@@ -1076,21 +1094,20 @@ public class EntityBuilder
     {
         boolean playbackCache = false;
         final long id = json.getLong("id");
-        CategoryImpl channel = (CategoryImpl) getJDA().getCategoriesView().get(id);
+        CategoryImpl channel = (CategoryImpl) getJDA().getCategoryById(id);
         if (channel == null)
         {
             if (guild == null)
                 guild = (GuildImpl) getJDA().getGuildsView().get(guildId);
-            SnowflakeCacheViewImpl<Category>
-                    guildCategoryView = guild.getCategoriesView(),
-                    categoryView = getJDA().getCategoriesView();
+            ChannelCacheViewImpl<GuildChannel> guildView = guild.getChannelView();
+            ChannelCacheViewImpl<Channel> globalView = getJDA().getChannelsView();
             try (
-                UnlockHook glock = guildCategoryView.writeLock();
-                UnlockHook jlock = categoryView.writeLock())
+                UnlockHook glock = guildView.writeLock();
+                UnlockHook jlock = globalView.writeLock())
             {
                 channel = new CategoryImpl(id, guild);
-                guildCategoryView.getMap().put(id, channel);
-                playbackCache = categoryView.getMap().put(id, channel) == null;
+                guildView.put(channel);
+                playbackCache = globalView.put(channel) == null;
             }
         }
 
@@ -1114,21 +1131,20 @@ public class EntityBuilder
     {
         boolean playbackCache = false;
         final long id = json.getLong("id");
-        TextChannelImpl channel = (TextChannelImpl) getJDA().getTextChannelsView().get(id);
+        TextChannelImpl channel = (TextChannelImpl) getJDA().getTextChannelById(id);
         if (channel == null)
         {
             if (guildObj == null)
                 guildObj = (GuildImpl) getJDA().getGuildsView().get(guildId);
-            SnowflakeCacheViewImpl<TextChannel>
-                    guildTextView = guildObj.getTextChannelsView(),
-                    textView = getJDA().getTextChannelsView();
+            ChannelCacheViewImpl<GuildChannel> guildView = guildObj.getChannelView();
+            ChannelCacheViewImpl<Channel> globalView = getJDA().getChannelsView();
             try (
-                UnlockHook glock = guildTextView.writeLock();
-                UnlockHook jlock = textView.writeLock())
+                    UnlockHook glock = guildView.writeLock();
+                    UnlockHook jlock = globalView.writeLock())
             {
                 channel = new TextChannelImpl(id, guildObj);
-                guildTextView.getMap().put(id, channel);
-                playbackCache = textView.getMap().put(id, channel) == null;
+                guildView.put(channel);
+                playbackCache = globalView.put(channel) == null;
             }
         }
 
@@ -1158,21 +1174,20 @@ public class EntityBuilder
     {
         boolean playbackCache = false;
         final long id = json.getLong("id");
-        NewsChannelImpl channel = (NewsChannelImpl) getJDA().getNewsChannelView().get(id);
+        NewsChannelImpl channel = (NewsChannelImpl) getJDA().getNewsChannelById(id);
         if (channel == null)
         {
             if (guildObj == null)
                 guildObj = (GuildImpl) getJDA().getGuildsView().get(guildId);
-            SnowflakeCacheViewImpl<NewsChannel>
-                    guildNewsView = guildObj.getNewsChannelView(),
-                    newsView = getJDA().getNewsChannelView();
+            ChannelCacheViewImpl<GuildChannel> guildView = guildObj.getChannelView();
+            ChannelCacheViewImpl<Channel> globalView = getJDA().getChannelsView();
             try (
-                    UnlockHook glock = guildNewsView.writeLock();
-                    UnlockHook jlock = newsView.writeLock())
+                    UnlockHook glock = guildView.writeLock();
+                    UnlockHook jlock = globalView.writeLock())
             {
                 channel = new NewsChannelImpl(id, guildObj);
-                guildNewsView.getMap().put(id, channel);
-                playbackCache = newsView.getMap().put(id, channel) == null;
+                guildView.put(channel);
+                playbackCache = globalView.put(channel) == null;
             }
         }
 
@@ -1199,21 +1214,20 @@ public class EntityBuilder
     {
         boolean playbackCache = false;
         final long id = json.getLong("id");
-        VoiceChannelImpl channel = ((VoiceChannelImpl) getJDA().getVoiceChannelsView().get(id));
+        VoiceChannelImpl channel = (VoiceChannelImpl) getJDA().getVoiceChannelById(id);
         if (channel == null)
         {
             if (guild == null)
                 guild = (GuildImpl) getJDA().getGuildsView().get(guildId);
-            SnowflakeCacheViewImpl<VoiceChannel>
-                    guildVoiceView = guild.getVoiceChannelsView(),
-                    voiceView = getJDA().getVoiceChannelsView();
+            ChannelCacheViewImpl<GuildChannel> guildView = guild.getChannelView();
+            ChannelCacheViewImpl<Channel> globalView = getJDA().getChannelsView();
             try (
-                UnlockHook vlock = guildVoiceView.writeLock();
-                UnlockHook jlock = voiceView.writeLock())
+                    UnlockHook glock = guildView.writeLock();
+                    UnlockHook jlock = globalView.writeLock())
             {
                 channel = new VoiceChannelImpl(id, guild);
-                guildVoiceView.getMap().put(id, channel);
-                playbackCache = voiceView.getMap().put(id, channel) == null;
+                guildView.put(channel);
+                playbackCache = globalView.put(channel) == null;
             }
         }
 
@@ -1221,6 +1235,7 @@ public class EntityBuilder
             .setParentCategory(json.getLong("parent_id", 0))
             .setLatestMessageIdLong(json.getLong("last_message_id", 0))
             .setName(json.getString("name"))
+            .setStatus(json.getString("status", ""))
             .setPosition(json.getInt("position"))
             .setUserLimit(json.getInt("user_limit"))
             .setNSFW(json.getBoolean("nsfw"))
@@ -1244,21 +1259,20 @@ public class EntityBuilder
     {
         boolean playbackCache = false;
         final long id = json.getLong("id");
-        StageChannelImpl channel = ((StageChannelImpl) getJDA().getStageChannelView().get(id));
+        StageChannelImpl channel = (StageChannelImpl) getJDA().getStageChannelById(id);
         if (channel == null)
         {
             if (guild == null)
                 guild = (GuildImpl) getJDA().getGuildsView().get(guildId);
-            SnowflakeCacheViewImpl<StageChannel>
-                    guildStageView = guild.getStageChannelsView(),
-                    stageView = getJDA().getStageChannelView();
+            ChannelCacheViewImpl<GuildChannel> guildView = guild.getChannelView();
+            ChannelCacheViewImpl<Channel> globalView = getJDA().getChannelsView();
             try (
-                    UnlockHook vlock = guildStageView.writeLock();
-                    UnlockHook jlock = stageView.writeLock())
+                    UnlockHook glock = guildView.writeLock();
+                    UnlockHook jlock = globalView.writeLock())
             {
                 channel = new StageChannelImpl(id, guild);
-                guildStageView.getMap().put(id, channel);
-                playbackCache = stageView.getMap().put(id, channel) == null;
+                guildView.put(channel);
+                playbackCache = globalView.put(channel) == null;
             }
         }
 
@@ -1287,6 +1301,11 @@ public class EntityBuilder
 
     public ThreadChannel createThreadChannel(GuildImpl guild, DataObject json, long guildId)
     {
+        return createThreadChannel(guild, json, guildId, true);
+    }
+
+    public ThreadChannel createThreadChannel(GuildImpl guild, DataObject json, long guildId, boolean modifyCache)
+    {
         boolean playbackCache = false;
         final long id = json.getUnsignedLong("id");
         final long parentId = json.getUnsignedLong("parent_id");
@@ -1299,19 +1318,21 @@ public class EntityBuilder
         if (parent == null)
             throw new IllegalArgumentException(MISSING_CHANNEL);
 
-        ThreadChannelImpl channel = ((ThreadChannelImpl) getJDA().getThreadChannelsView().get(id));
+        ThreadChannelImpl channel = ((ThreadChannelImpl) getJDA().getThreadChannelById(id));
         if (channel == null)
         {
-            SnowflakeCacheViewImpl<ThreadChannel>
-                    guildThreadView = guild.getThreadChannelsView(),
-                    threadView = getJDA().getThreadChannelsView();
+            ChannelCacheViewImpl<GuildChannel> guildThreadView = guild.getChannelView();
+            ChannelCacheViewImpl<Channel> threadView = getJDA().getChannelsView();
             try (
                     UnlockHook vlock = guildThreadView.writeLock();
                     UnlockHook jlock = threadView.writeLock())
             {
                 channel = new ThreadChannelImpl(id, guild, type);
-                guildThreadView.getMap().put(id, channel);
-                playbackCache = threadView.getMap().put(id, channel) == null;
+                if (modifyCache)
+                {
+                    guildThreadView.put(channel);
+                    playbackCache = threadView.put(channel) == null;
+                }
             }
         }
 
@@ -1383,21 +1404,20 @@ public class EntityBuilder
     {
         boolean playbackCache = false;
         final long id = json.getLong("id");
-        ForumChannelImpl channel = (ForumChannelImpl) getJDA().getForumChannelsView().get(id);
+        ForumChannelImpl channel = (ForumChannelImpl) getJDA().getForumChannelById(id);
         if (channel == null)
         {
             if (guild == null)
                 guild = (GuildImpl) getJDA().getGuildsView().get(guildId);
-            SnowflakeCacheViewImpl<ForumChannel>
-                    guildView = guild.getForumChannelsView(),
-                    globalView = getJDA().getForumChannelsView();
+            ChannelCacheViewImpl<GuildChannel> guildView = guild.getChannelView();
+            ChannelCacheViewImpl<Channel> globalView = getJDA().getChannelsView();
             try (
-                    UnlockHook vlock = guildView.writeLock();
+                    UnlockHook glock = guildView.writeLock();
                     UnlockHook jlock = globalView.writeLock())
             {
                 channel = new ForumChannelImpl(id, guild);
-                guildView.getMap().put(id, channel);
-                playbackCache = globalView.getMap().put(id, channel) == null;
+                guildView.put(channel);
+                playbackCache = globalView.put(channel) == null;
             }
         }
 
@@ -1412,7 +1432,7 @@ public class EntityBuilder
                 .setParentCategory(json.getLong("parent_id", 0))
                 .setFlags(json.getInt("flags", 0))
                 .setDefaultReaction(json.optObject("default_reaction_emoji").orElse(null))
-//                .setDefaultSortOrder(json.getInt("default_sort_order", -1))
+                .setDefaultSortOrder(json.getInt("default_sort_order", -1))
                 .setDefaultLayout(json.getInt("default_forum_layout", -1))
                 .setName(json.getString("name"))
                 .setTopic(json.getString("topic", null))
@@ -1427,7 +1447,58 @@ public class EntityBuilder
         return channel;
     }
 
-    public ForumTagImpl createForumTag(ForumChannelImpl channel, DataObject json, int index)
+    public MediaChannel createMediaChannel(DataObject json, long guildId)
+    {
+        return createMediaChannel(null, json, guildId);
+    }
+
+    public MediaChannel createMediaChannel(GuildImpl guild, DataObject json, long guildId)
+    {
+        boolean playbackCache = false;
+        final long id = json.getLong("id");
+        MediaChannelImpl channel = (MediaChannelImpl) getJDA().getMediaChannelById(id);
+        if (channel == null)
+        {
+            if (guild == null)
+                guild = (GuildImpl) getJDA().getGuildsView().get(guildId);
+            ChannelCacheViewImpl<GuildChannel> guildView = guild.getChannelView();
+            ChannelCacheViewImpl<Channel> globalView = getJDA().getChannelsView();
+            try (
+                    UnlockHook glock = guildView.writeLock();
+                    UnlockHook jlock = globalView.writeLock())
+            {
+                channel = new MediaChannelImpl(id, guild);
+                guildView.put(channel);
+                playbackCache = globalView.put(channel) == null;
+            }
+        }
+
+        if (api.isCacheFlagSet(CacheFlag.FORUM_TAGS))
+        {
+            DataArray tags = json.getArray("available_tags");
+            for (int i = 0; i < tags.length(); i++)
+                createForumTag(channel, tags.getObject(i), i);
+        }
+
+        channel
+                .setParentCategory(json.getLong("parent_id", 0))
+                .setFlags(json.getInt("flags", 0))
+                .setDefaultReaction(json.optObject("default_reaction_emoji").orElse(null))
+                .setDefaultSortOrder(json.getInt("default_sort_order", -1))
+                .setName(json.getString("name"))
+                .setTopic(json.getString("topic", null))
+                .setPosition(json.getInt("position"))
+                .setDefaultThreadSlowmode(json.getInt("default_thread_rate_limit_per_user", 0))
+                .setSlowmode(json.getInt("rate_limit_per_user", 0))
+                .setNSFW(json.getBoolean("nsfw"));
+
+        createOverridesPass(channel, json.getArray("permission_overwrites"));
+        if (playbackCache)
+            getJDA().getEventCache().playbackCache(EventCache.Type.CHANNEL, id);
+        return channel;
+    }
+
+    public ForumTagImpl createForumTag(IPostContainerMixin<?> channel, DataObject json, int index)
     {
         final long id = json.getUnsignedLong("id");
         SortedSnowflakeCacheViewImpl<ForumTag> cache = channel.getAvailableTagCache();
@@ -1497,11 +1568,8 @@ public class EntityBuilder
 
     private void cachePrivateChannel(PrivateChannelImpl priv)
     {
-        SnowflakeCacheViewImpl<PrivateChannel> privateView = getJDA().getPrivateChannelsView();
-        try (UnlockHook hook = privateView.writeLock())
-        {
-            privateView.getMap().put(priv.getIdLong(), priv);
-        }
+        ChannelCacheViewImpl<Channel> privateView = getJDA().getChannelsView();
+        privateView.put(priv);
         api.usedPrivateChannel(priv.getIdLong());
         getJDA().getEventCache().playbackCache(EventCache.Type.CHANNEL, priv.getIdLong());
     }
@@ -1590,11 +1658,24 @@ public class EntityBuilder
         return role;
     }
 
+    public ReceivedMessage createMessageBestEffort(DataObject json, MessageChannel channel, Guild guild)
+    {
+        if (channel != null)
+            return createMessageWithChannel(json, channel, false);
+        else
+            return createMessageFromWebhook(json, guild);
+    }
+
+    public ReceivedMessage createMessageFromWebhook(DataObject json, @Nullable Guild guild)
+    {
+        return createMessage0(json, null, (GuildImpl) guild, false);
+    }
+
     public ReceivedMessage createMessageWithChannel(DataObject json, @Nonnull MessageChannel channel, boolean modifyCache)
     {
         // Use channel directly if message is from a known guild channel
         if (channel instanceof GuildMessageChannel)
-            return createMessage0(json, channel, modifyCache);
+            return createMessage0(json, channel, (GuildImpl) ((GuildMessageChannel) channel).getGuild(), modifyCache);
         // Try to resolve private channel recipient if needed
         if (channel instanceof PrivateChannel)
             return createMessageWithLookup(json, null, modifyCache);
@@ -1606,12 +1687,12 @@ public class EntityBuilder
         //Private channels may be partial in our cache and missing recipient information
         // we can try and derive the user from the message here
         if (guild == null)
-            return createMessage0(json, createPrivateChannelByMessage(json), modifyCache);
+            return createMessage0(json, createPrivateChannelByMessage(json), null, modifyCache);
         //If we know that the message was sent in a guild, we can use the guild to resolve the channel directly
-        MessageChannel channel = guild.getChannelById(MessageChannel.class, json.getUnsignedLong("channel_id"));
-        if (channel == null)
-            throw new IllegalArgumentException(MISSING_CHANNEL);
-        return createMessage0(json, channel, modifyCache);
+        MessageChannel channel = guild.getChannelById(GuildMessageChannel.class, json.getUnsignedLong("channel_id"));
+//        if (channel == null)
+//            throw new IllegalArgumentException(MISSING_CHANNEL);
+        return createMessage0(json, channel, (GuildImpl) guild, modifyCache);
     }
 
     // This tries to build a private channel instance through an arbitrary message object
@@ -1648,7 +1729,7 @@ public class EntityBuilder
         return channel;
     }
 
-    private ReceivedMessage createMessage0(DataObject jsonObject, @Nonnull MessageChannel channel, boolean modifyCache)
+    private ReceivedMessage createMessage0(DataObject jsonObject, @Nullable MessageChannel channel, @Nullable GuildImpl guild, boolean modifyCache)
     {
         MessageType type = MessageType.fromId(jsonObject.getInt("type"));
         if (type == MessageType.UNKNOWN)
@@ -1657,13 +1738,14 @@ public class EntityBuilder
         final long id = jsonObject.getLong("id");
         final DataObject author = jsonObject.getObject("author");
         final long authorId = author.getLong("id");
+        final long channelId = jsonObject.getUnsignedLong("channel_id");
+        final long guildId = channel instanceof GuildChannel
+                ? ((GuildChannel) channel).getGuild().getIdLong()
+                : jsonObject.getUnsignedLong("guild_id", 0L);
         MemberImpl member = null;
-        GuildImpl guild = null;
-        if (channel instanceof GuildChannel)
-            guild = (GuildImpl) ((GuildChannel) channel).getGuild();
 
         // Member details for author
-        if (channel.getType().isGuild() && !jsonObject.isNull("member"))
+        if (guild != null && !jsonObject.isNull("member"))
         {
             DataObject memberJson = jsonObject.getObject("member");
             memberJson.put("user", author);
@@ -1689,8 +1771,11 @@ public class EntityBuilder
         MessageChannel tmpChannel = channel; // because java
         final List<Message.Attachment> attachments = map(jsonObject, "attachments",   this::createMessageAttachment);
         final List<MessageEmbed>       embeds      = map(jsonObject, "embeds",        this::createMessageEmbed);
-        final List<MessageReaction>    reactions   = map(jsonObject, "reactions",     (obj) -> createMessageReaction(tmpChannel, id, obj));
+        final List<MessageReaction>    reactions   = map(jsonObject, "reactions",     (obj) -> createMessageReaction(tmpChannel, channelId, id, obj));
         final List<StickerItem>        stickers    = map(jsonObject, "sticker_items", this::createStickerItem);
+        final List<LayoutComponent>    components  = map(jsonObject, "components",    ActionRow::fromData, obj -> obj.getInt("type", -1) == 1);
+
+        MessagePoll poll = jsonObject.optObject("poll").map(EntityBuilder::createMessagePoll).orElse(null);
 
         // Message activity (for game invites/spotify)
         MessageActivity activity = null;
@@ -1712,7 +1797,7 @@ public class EntityBuilder
                     throw new IllegalArgumentException(MISSING_USER); // Specifically for MESSAGE_CREATE
             }
         }
-        else
+        else if (channel instanceof PrivateChannel)
         {
             //Assume private channel
             if (authorId == getJDA().getSelfUser().getIdLong())
@@ -1728,6 +1813,10 @@ public class EntityBuilder
                 user = ((PrivateChannel) channel).getUser();
             }
         }
+        else
+        {
+            user = createUser(author);
+        }
 
         if (modifyCache && !fromWebhook) // update the user information on message receive
             updateUser((UserImpl) user, author);
@@ -1739,7 +1828,7 @@ public class EntityBuilder
             DataObject referenceJson = jsonObject.getObject("referenced_message");
             try
             {
-                referencedMessage = createMessage0(referenceJson, channel, false);
+                referencedMessage = createMessage0(referenceJson, channel, guild, false);
             }
             catch (IllegalArgumentException ex)
             {
@@ -1754,30 +1843,24 @@ public class EntityBuilder
             }
         }
 
+        List<MessageSnapshot> snapshots = Collections.emptyList();
         MessageReference messageReference = null;
         if (!jsonObject.isNull("message_reference")) // always contains the channel + message id for a referenced message
         {                                                // used for when referenced_message is not provided
             DataObject messageReferenceJson = jsonObject.getObject("message_reference");
 
             messageReference = new MessageReference(
+                    messageReferenceJson.getInt("type", -1),
                     messageReferenceJson.getLong("message_id", 0),
                     messageReferenceJson.getLong("channel_id", 0),
                     messageReferenceJson.getLong("guild_id", 0),
                     referencedMessage,
                     api
             );
-        }
 
-        // Message Components
-        List<ActionRow> components = Collections.emptyList();
-        Optional<DataArray> componentsArrayOpt = jsonObject.optArray("components");
-        if (componentsArrayOpt.isPresent())
-        {
-            DataArray array = componentsArrayOpt.get();
-            components = array.stream(DataArray::getObject)
-                    .filter(it -> it.getInt("type", 0) == 1)
-                    .map(ActionRow::fromData)
-                    .collect(Collectors.toList());
+
+            MessageReference finalReference = messageReference;
+            snapshots = map(jsonObject, "message_snapshots", (obj) -> createMessageSnapshot(finalReference, obj.getObject("message")));
         }
 
         // Application command and component replies
@@ -1797,16 +1880,9 @@ public class EntityBuilder
 
         int position = jsonObject.getInt("position", -1);
 
-        if (!type.isSystem())
-        {
-            return new ReceivedMessage(id, channel, type, messageReference, fromWebhook, applicationId, tts, pinned,
-                    content, nonce, user, member, activity, editTime, mentions, reactions, attachments, embeds, stickers, components, flags, messageInteraction, startedThread, position);
-        }
-        else
-        {
-            return new SystemMessage(id, channel, type, messageReference, fromWebhook, applicationId, tts, pinned,
-                    content, nonce, user, member, activity, editTime, mentions, reactions, attachments, embeds, stickers, flags, startedThread, position);
-        }
+        return new ReceivedMessage(id, channelId, guildId, api, guild, channel, type, messageReference, fromWebhook, applicationId, tts, pinned,
+                content, nonce, user, member, activity, poll, editTime, mentions, reactions, attachments, embeds, stickers, components, snapshots,
+                flags, messageInteraction, startedThread, position);
     }
 
     private static MessageActivity createMessageActivity(DataObject jsonObject)
@@ -1836,14 +1912,62 @@ public class EntityBuilder
         return new MessageActivity(activityType, partyId, application);
     }
 
-    public MessageReaction createMessageReaction(MessageChannel chan, long id, DataObject obj)
+    public static MessagePollImpl createMessagePoll(DataObject data)
+    {
+        MessagePoll.LayoutType layout = MessagePoll.LayoutType.fromKey(data.getInt("layout_type"));
+        OffsetDateTime expiresAt = data.isNull("expiry") ? null : data.getOffsetDateTime("expiry");
+        boolean isMultiAnswer = data.getBoolean("allow_multiselect");
+
+        DataArray answersData = data.getArray("answers");
+        DataObject questionData = data.getObject("question");
+
+        DataObject resultsData = data.optObject("results").orElseGet(
+            () -> DataObject.empty().put("answer_counts", DataArray.empty()) // FIXME: Discord bug
+        );
+        boolean isFinalized = resultsData.getBoolean("is_finalized");
+
+        DataArray resultVotes = resultsData.getArray("answer_counts");
+        TLongObjectMap<DataObject> voteMapping = new TLongObjectHashMap<>();
+        resultVotes.stream(DataArray::getObject)
+                .forEach(votes -> voteMapping.put(votes.getLong("id"), votes));
+
+        MessagePoll.Question question = new MessagePoll.Question(
+                questionData.getString("text"),
+                questionData.optObject("emoji").map(Emoji::fromData).orElse(null));
+
+        List<MessagePoll.Answer> answers = answersData.stream(DataArray::getObject)
+                .map(answer -> {
+                    long answerId = answer.getLong("answer_id");
+                    DataObject media = answer.getObject("poll_media");
+                    DataObject votes = voteMapping.get(answerId);
+                    return new MessagePoll.Answer(
+                        answerId,
+                        media.getString("text"),
+                        media.optObject("emoji").map(Emoji::fromData).orElse(null),
+                        votes != null ? votes.getInt("count") : 0,
+                        votes != null && votes.getBoolean("me_voted")
+                    );
+                })
+                .collect(Helpers.toUnmodifiableList());
+
+        return new MessagePollImpl(layout, question, answers, expiresAt, isMultiAnswer, isFinalized);
+    }
+
+    public MessageReaction createMessageReaction(MessageChannel chan, long channelId, long messageId, DataObject obj)
     {
         DataObject emoji = obj.getObject("emoji");
-        final int count = obj.getInt("count", -1);
-        final boolean me = obj.getBoolean("me");
+        final int[] count = new int[]{
+                obj.getInt("count", 0), // total
+                obj.optObject("count_details").map(o -> o.getInt("normal", 0)).orElse(0),
+                obj.optObject("count_details").map(o -> o.getInt("burst", 0)).orElse(0),
+        };
+        final boolean[] me = new boolean[] {
+                obj.getBoolean("me"), // normal
+                obj.getBoolean("me_burst") // super
+        };
         EmojiUnion emojiObj = createEmoji(emoji);
 
-        return new MessageReaction(chan, emojiObj, id, me, count);
+        return new MessageReaction(api, chan, emojiObj, channelId, messageId, me, count);
     }
 
     public Message.Attachment createMessageAttachment(DataObject jsonObject)
@@ -1923,6 +2047,7 @@ public class EntityBuilder
         {
             DataObject obj = content.getObject("video");
             video = new VideoInfo(obj.getString("url", null),
+                                  obj.getString("proxy_url", null),
                                   obj.getInt("width", -1),
                                   obj.getInt("height", -1));
         }
@@ -2062,6 +2187,34 @@ public class EntityBuilder
         }
 
         return new Message.Interaction(id, type, name, user, member);
+    }
+
+    public MessageSnapshot createMessageSnapshot(MessageReference messageReference, DataObject jsonObject)
+    {
+        MessageType type = MessageType.fromId(jsonObject.getInt("type"));
+
+        String content = jsonObject.getString("content", "");
+        OffsetDateTime editTime = jsonObject.isNull("edited_timestamp") ? null : OffsetDateTime.parse(jsonObject.getString("edited_timestamp"));
+        int flags = jsonObject.getInt("flags", 0);
+        boolean mentionsEveryone = jsonObject.getBoolean("mention_everyone");
+
+        List<Message.Attachment> attachments = map(jsonObject, "attachments",   this::createMessageAttachment);
+        List<MessageEmbed>       embeds      = map(jsonObject, "embeds",        this::createMessageEmbed);
+        List<StickerItem>        stickers    = map(jsonObject, "sticker_items", this::createStickerItem);
+        List<LayoutComponent>    components  = map(jsonObject, "components",    ActionRow::fromData, obj -> obj.getInt("type", -1) == 1);
+
+        Guild guild = messageReference.getGuild();
+        // Lazy Mention parsing and caching (includes reply mentions)
+        // This only works if the message is from the same guild
+        Mentions mentions = new MessageMentionsImpl(
+            api, guild instanceof GuildImpl ? (GuildImpl) guild : null, content, mentionsEveryone,
+            jsonObject.getArray("mentions"),
+            jsonObject.optArray("mention_roles").orElseGet(DataArray::empty)
+        );
+
+        return new MessageSnapshot(
+            type, mentions, editTime, content, attachments, embeds, components, stickers, flags
+        );
     }
 
     @Nullable
@@ -2397,6 +2550,11 @@ public class EntityBuilder
         final List<String> tags = object.optArray("tags").orElseGet(DataArray::empty)
                     .stream(DataArray::getString)
                     .collect(Collectors.toList());
+        final List<String> redirectUris = object.optArray("redirect_uris").orElseGet(DataArray::empty)
+                .stream(DataArray::getString)
+                .collect(Collectors.toList());
+        final String interactionsEndpointUrl = object.getString("interactions_endpoint_url", null);
+        final String roleConnectionsVerificationUrl = object.getString("role_connections_verification_url", null);
 
         final Optional<DataObject> installParams = object.optObject("install_params");
 
@@ -2409,7 +2567,8 @@ public class EntityBuilder
                     .orElse(Collections.emptyList());
 
         return new ApplicationInfoImpl(getJDA(), description, doesBotRequireCodeGrant, iconId, id, flags, isBotPublic, name,
-                termsOfServiceUrl, privacyPolicyUrl, owner, team, tags, customAuthUrl, defaultAuthUrlPerms, defaultAuthUrlScopes);
+                termsOfServiceUrl, privacyPolicyUrl, owner, team, tags, redirectUris, interactionsEndpointUrl,
+                roleConnectionsVerificationUrl, customAuthUrl, defaultAuthUrlPerms, defaultAuthUrlScopes);
     }
 
     public ApplicationTeam createApplicationTeam(DataObject object)
@@ -2421,7 +2580,10 @@ public class EntityBuilder
             DataObject userJson = o.getObject("user");
             TeamMember.MembershipState state = TeamMember.MembershipState.fromKey(o.getInt("membership_state"));
             User user = createUser(userJson);
-            return new TeamMemberImpl(user, state, id);
+            TeamMember.RoleType roleType = user.getIdLong() == ownerId
+                    ? TeamMember.RoleType.OWNER
+                    : TeamMember.RoleType.fromKey(o.getString("role", ""));
+            return new TeamMemberImpl(user, state, roleType, id);
         });
         return new ApplicationTeamImpl(iconId, members, id, ownerId);
     }
@@ -2471,12 +2633,34 @@ public class EntityBuilder
         return new AuditLogChange(oldValue, newValue, key);
     }
 
+    public Entitlement createEntitlement(DataObject object)
+    {
+        return new EntitlementImpl(
+                getJDA(),
+                object.getUnsignedLong("id"),
+                object.getUnsignedLong("sku_id"),
+                object.getUnsignedLong("application_id"),
+                object.getUnsignedLong("user_id", 0),
+                object.getUnsignedLong("guild_id", 0),
+                Entitlement.EntitlementType.fromKey(object.getInt("type")),
+                object.getBoolean("deleted"),
+                object.getOffsetDateTime("starts_at", null),
+                object.getOffsetDateTime("ends_at", null),
+                object.getBoolean("consumed", false)
+        );
+    }
+
     private Map<String, AuditLogChange> changeToMap(Set<AuditLogChange> changesList)
     {
         return changesList.stream().collect(Collectors.toMap(AuditLogChange::getKey, UnaryOperator.identity()));
     }
 
     private <T> List<T> map(DataObject jsonObject, String key, Function<DataObject, T> convert)
+    {
+        return map(jsonObject, key, convert, (ignored) -> true);
+    }
+
+    private <T> List<T> map(DataObject jsonObject, String key, Function<DataObject, T> convert, Predicate<DataObject> filter)
     {
         if (jsonObject.isNull(key))
             return Collections.emptyList();
@@ -2486,9 +2670,18 @@ public class EntityBuilder
         for (int i = 0; i < arr.length(); i++)
         {
             DataObject obj = arr.getObject(i);
-            T result = convert.apply(obj);
-            if (result != null)
-                mappedObjects.add(result);
+            try
+            {
+                if (!filter.test(obj))
+                    continue;
+                T result = convert.apply(obj);
+                if (result != null)
+                    mappedObjects.add(result);
+            }
+            catch (Exception e)
+            {
+                LOG.error("Failed to parse element in {} with content {}", key, obj, e);
+            }
         }
 
         return mappedObjects;

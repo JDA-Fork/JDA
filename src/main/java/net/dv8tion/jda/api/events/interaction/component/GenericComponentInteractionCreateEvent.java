@@ -27,8 +27,10 @@ import net.dv8tion.jda.api.interactions.components.ComponentInteraction;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.requests.restaction.interactions.MessageEditCallbackAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ModalCallbackAction;
+import net.dv8tion.jda.api.requests.restaction.interactions.PremiumRequiredCallbackAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 
 /**
@@ -60,7 +62,7 @@ public class GenericComponentInteractionCreateEvent extends GenericInteractionCr
     @Override
     public MessageChannelUnion getChannel()
     {
-        return (MessageChannelUnion) interaction.getChannel();
+        return interaction.getChannel();
     }
 
     @Nonnull
@@ -99,6 +101,7 @@ public class GenericComponentInteractionCreateEvent extends GenericInteractionCr
 
     @Nonnull
     @Override
+    @CheckReturnValue
     public MessageEditCallbackAction deferEdit()
     {
         return interaction.deferEdit();
@@ -113,6 +116,7 @@ public class GenericComponentInteractionCreateEvent extends GenericInteractionCr
 
     @Nonnull
     @Override
+    @CheckReturnValue
     public ReplyCallbackAction deferReply()
     {
         return interaction.deferReply();
@@ -120,8 +124,18 @@ public class GenericComponentInteractionCreateEvent extends GenericInteractionCr
 
     @Nonnull
     @Override
+    @CheckReturnValue
     public ModalCallbackAction replyModal(@Nonnull Modal modal)
     {
         return interaction.replyModal(modal);
+    }
+
+    @Nonnull
+    @Override
+    @Deprecated
+    @CheckReturnValue
+    public PremiumRequiredCallbackAction replyWithPremiumRequired()
+    {
+        return interaction.replyWithPremiumRequired();
     }
 }

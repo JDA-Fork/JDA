@@ -34,7 +34,6 @@ import net.dv8tion.jda.internal.entities.GuildImpl;
 import net.dv8tion.jda.internal.entities.MemberImpl;
 import net.dv8tion.jda.internal.entities.channel.concrete.PrivateChannelImpl;
 import net.dv8tion.jda.internal.requests.WebSocketClient;
-import net.dv8tion.jda.internal.utils.JDALogger;
 
 import java.util.List;
 import java.util.Objects;
@@ -73,8 +72,7 @@ public class MessageReactionHandler extends SocketHandler
 
         if (emojiId == null && emojiName == null)
         {
-            WebSocketClient.LOG.debug("Received a reaction {} with no name nor id. json: {}",
-                JDALogger.getLazyString(() -> add ? "add" : "remove"), content);
+            WebSocketClient.LOG.debug("Received a reaction {} with no name nor id. json: {}", add ? "add" : "remove", content);
             return null;
         }
         final long guildId = content.getUnsignedLong("guild_id", 0);
@@ -158,7 +156,13 @@ public class MessageReactionHandler extends SocketHandler
         // reaction remove has null name sometimes
         EmojiUnion rEmoji = EntityBuilder.createEmoji(emoji);
 
-        MessageReaction reaction = new MessageReaction(channel, rEmoji, messageId, userId == api.getSelfUser().getIdLong(), -1);
+        // We don't know if it is a normal or super reaction
+        boolean[] self = new boolean[] {
+            false,
+            false
+        };
+
+        MessageReaction reaction = new MessageReaction(api, channel, rEmoji, channelId, messageId, self, null);
 
         if (channel.getType() == ChannelType.PRIVATE)
         {

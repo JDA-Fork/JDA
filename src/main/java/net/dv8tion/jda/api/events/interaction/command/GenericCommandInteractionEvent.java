@@ -24,8 +24,10 @@ import net.dv8tion.jda.api.interactions.commands.CommandInteraction;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.requests.restaction.interactions.ModalCallbackAction;
+import net.dv8tion.jda.api.requests.restaction.interactions.PremiumRequiredCallbackAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
@@ -107,6 +109,7 @@ public class GenericCommandInteractionEvent extends GenericInteractionCreateEven
 
     @Nonnull
     @Override
+    @CheckReturnValue
     public ReplyCallbackAction deferReply()
     {
         return getInteraction().deferReply();
@@ -114,8 +117,18 @@ public class GenericCommandInteractionEvent extends GenericInteractionCreateEven
 
     @Nonnull
     @Override
+    @CheckReturnValue
     public ModalCallbackAction replyModal(@Nonnull Modal modal)
     {
         return getInteraction().replyModal(modal);
+    }
+
+    @Nonnull
+    @Override
+    @Deprecated
+    @CheckReturnValue
+    public PremiumRequiredCallbackAction replyWithPremiumRequired()
+    {
+        return getInteraction().replyWithPremiumRequired();
     }
 }

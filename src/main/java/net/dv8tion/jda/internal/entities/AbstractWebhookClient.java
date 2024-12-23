@@ -21,19 +21,19 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.WebhookClient;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.LayoutComponent;
-import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.Route;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
+import net.dv8tion.jda.api.requests.restaction.WebhookMessageDeleteAction;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
 import net.dv8tion.jda.api.utils.AttachedFile;
 import net.dv8tion.jda.api.utils.FileUpload;
 import net.dv8tion.jda.api.utils.messages.MessageCreateData;
 import net.dv8tion.jda.api.utils.messages.MessageEditData;
-import net.dv8tion.jda.internal.requests.RestActionImpl;
+import net.dv8tion.jda.api.utils.messages.MessagePollData;
 import net.dv8tion.jda.internal.requests.restaction.WebhookMessageCreateActionImpl;
+import net.dv8tion.jda.internal.requests.restaction.WebhookMessageDeleteActionImpl;
 import net.dv8tion.jda.internal.requests.restaction.WebhookMessageEditActionImpl;
 import net.dv8tion.jda.internal.utils.Checks;
-import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -51,6 +51,25 @@ public abstract class AbstractWebhookClient<T> implements WebhookClient<T>
         this.id = webhookId;
         this.token = webhookToken;
         this.api = api;
+    }
+
+    @Override
+    public long getIdLong()
+    {
+        return id;
+    }
+
+    @Override
+    public String getToken()
+    {
+        return token;
+    }
+
+    @Nonnull
+    @Override
+    public JDA getJDA()
+    {
+        return api;
     }
 
     public abstract WebhookMessageCreateActionImpl<T> sendRequest();
@@ -72,7 +91,7 @@ public abstract class AbstractWebhookClient<T> implements WebhookClient<T>
 
     @Nonnull
     @Override
-    public WebhookMessageCreateAction<T> sendMessageComponents(@NotNull Collection<? extends LayoutComponent> components)
+    public WebhookMessageCreateAction<T> sendMessageComponents(@Nonnull Collection<? extends LayoutComponent> components)
     {
         return sendRequest().setComponents(components);
     }
@@ -82,6 +101,14 @@ public abstract class AbstractWebhookClient<T> implements WebhookClient<T>
     public WebhookMessageCreateAction<T> sendMessage(@Nonnull MessageCreateData message)
     {
         return sendRequest().applyData(message);
+    }
+
+    @Nonnull
+    @Override
+    public WebhookMessageCreateAction<T> sendMessagePoll(@Nonnull MessagePollData poll)
+    {
+        Checks.notNull(poll, "Message Poll");
+        return sendRequest().setPoll(poll);
     }
 
     @Nonnull
@@ -132,10 +159,11 @@ public abstract class AbstractWebhookClient<T> implements WebhookClient<T>
 
     @Nonnull
     @Override
-    public RestAction<Void> deleteMessageById(@Nonnull String messageId)
+    public WebhookMessageDeleteAction deleteMessageById(@Nonnull String messageId)
     {
-        Checks.isSnowflake(messageId);
+        if (!"@original".equals(messageId))
+            Checks.isSnowflake(messageId);
         Route.CompiledRoute route = Route.Webhooks.EXECUTE_WEBHOOK_DELETE.compile(Long.toUnsignedString(id), token, messageId);
-        return new RestActionImpl<>(api, route);
+        return new WebhookMessageDeleteActionImpl(api, route);
     }
 }

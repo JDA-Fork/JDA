@@ -17,27 +17,32 @@
 package net.dv8tion.jda.internal.interactions;
 
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Entitlement;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.interactions.DiscordLocale;
 import net.dv8tion.jda.api.interactions.Interaction;
+import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
-import net.dv8tion.jda.internal.entities.GuildImpl;
-import net.dv8tion.jda.internal.entities.MemberImpl;
-import net.dv8tion.jda.internal.entities.UserImpl;
+import net.dv8tion.jda.internal.entities.*;
 import net.dv8tion.jda.internal.entities.channel.concrete.PrivateChannelImpl;
+import net.dv8tion.jda.internal.utils.Helpers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class InteractionImpl implements Interaction
 {
     protected final long id;
+    protected final long channelId;
     protected final int type;
     protected final String token;
     protected final Guild guild;
@@ -45,6 +50,7 @@ public class InteractionImpl implements Interaction
     protected final User user;
     protected final Channel channel;
     protected final DiscordLocale userLocale;
+    protected final List<Entitlement> entitlements;
     protected final JDAImpl api;
 
     //This is used to give a proper error when an interaction is ack'd twice
@@ -58,6 +64,7 @@ public class InteractionImpl implements Interaction
         this.token = data.getString("token");
         this.type = data.getInt("type");
         this.guild = jda.getGuildById(data.getUnsignedLong("guild_id", 0L));
+        this.channelId = data.getUnsignedLong("channel_id", 0L);
         this.userLocale = DiscordLocale.from(data.getString("locale", "en-US"));
 
         DataObject channelJson = data.getObject("channel");
@@ -66,7 +73,13 @@ public class InteractionImpl implements Interaction
             member = jda.getEntityBuilder().createMember((GuildImpl) guild, data.getObject("member"));
             jda.getEntityBuilder().updateMemberCache((MemberImpl) member);
             user = member.getUser();
-            channel = guild.getGuildChannelById(channelJson.getUnsignedLong("id"));
+
+            GuildChannel channel = guild.getGuildChannelById(channelJson.getUnsignedLong("id"));
+            if (channel == null && ChannelType.fromId(channelJson.getInt("type")).isThread())
+                channel = api.getEntityBuilder().createThreadChannel((GuildImpl) guild, channelJson, guild.getIdLong(), false);
+            if (channel == null)
+                throw new IllegalStateException("Failed to create channel instance for interaction! Channel Type: " + channelJson.getInt("type"));
+            this.channel = channel;
         }
         else
         {
@@ -95,6 +108,11 @@ public class InteractionImpl implements Interaction
             }
             this.user = user;
         }
+
+        this.entitlements = data.optArray("entitlements").orElseGet(DataArray::empty)
+                .stream(DataArray::getObject)
+                .map(jda.getEntityBuilder()::createEntitlement)
+                .collect(Helpers.toUnmodifiableList());
     }
 
     // Used to allow interaction hook to send messages after acknowledgements
@@ -148,6 +166,12 @@ public class InteractionImpl implements Interaction
         return channel;
     }
 
+    @Override
+    public long getChannelIdLong()
+    {
+        return channelId;
+    }
+
     @Nonnull
     public DiscordLocale getUserLocale()
     {
@@ -166,6 +190,13 @@ public class InteractionImpl implements Interaction
     public Member getMember()
     {
         return member;
+    }
+
+    @Nonnull
+    @Override
+    public List<Entitlement> getEntitlements()
+    {
+        return entitlements;
     }
 
     @Nonnull

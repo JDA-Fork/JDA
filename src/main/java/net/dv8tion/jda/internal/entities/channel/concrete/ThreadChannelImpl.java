@@ -135,6 +135,8 @@ public class ThreadChannelImpl extends AbstractGuildChannelImpl<ThreadChannelImp
     public boolean canTalk(@Nonnull Member member)
     {
         Checks.notNull(member, "Member");
+        if (type == ChannelType.GUILD_PRIVATE_THREAD && threadMembers.get(member.getIdLong()) == null)
+            return member.hasPermission(getParentChannel(), Permission.MANAGE_THREADS, Permission.MESSAGE_SEND_IN_THREADS);
         return member.hasPermission(getParentChannel(), Permission.VIEW_CHANNEL, Permission.MESSAGE_SEND_IN_THREADS);
     }
 
@@ -149,6 +151,9 @@ public class ThreadChannelImpl extends AbstractGuildChannelImpl<ThreadChannelImp
     @Override
     public IThreadContainerUnion getParentChannel()
     {
+        IThreadContainer realChannel = getGuild().getChannelById(IThreadContainer.class, parentChannel.getIdLong());
+        if (realChannel != null)
+            parentChannel = (IThreadContainerUnion) realChannel;
         return parentChannel;
     }
 
@@ -243,6 +248,7 @@ public class ThreadChannelImpl extends AbstractGuildChannelImpl<ThreadChannelImp
         return invitable;
     }
 
+    @Nonnull
     @Override
     public OffsetDateTime getTimeArchiveInfoLastModified()
     {
@@ -269,6 +275,7 @@ public class ThreadChannelImpl extends AbstractGuildChannelImpl<ThreadChannelImp
         return slowmode;
     }
 
+    @Nonnull
     @Override
     public RestAction<Void> join()
     {
@@ -278,6 +285,7 @@ public class ThreadChannelImpl extends AbstractGuildChannelImpl<ThreadChannelImp
         return new RestActionImpl<>(api, route);
     }
 
+    @Nonnull
     @Override
     public RestAction<Void> leave()
     {
@@ -287,24 +295,27 @@ public class ThreadChannelImpl extends AbstractGuildChannelImpl<ThreadChannelImp
         return new RestActionImpl<>(api, route);
     }
 
+    @Nonnull
     @Override
     public RestAction<Void> addThreadMemberById(long id)
     {
         checkUnarchived();
+        checkInvitable();
+        checkPermission(Permission.MESSAGE_SEND_IN_THREADS);
 
         Route.CompiledRoute route = Route.Channels.ADD_THREAD_MEMBER.compile(getId(), Long.toUnsignedString(id));
         return new RestActionImpl<>(api, route);
     }
 
+    @Nonnull
     @Override
     public RestAction<Void> removeThreadMemberById(long id)
     {
         checkUnarchived();
 
         boolean privateThreadOwner = type == ChannelType.GUILD_PRIVATE_THREAD && ownerId == api.getSelfUser().getIdLong();
-        if (!privateThreadOwner) {
+        if (!privateThreadOwner)
             checkPermission(Permission.MANAGE_THREADS);
-        }
 
         Route.CompiledRoute route = Route.Channels.REMOVE_THREAD_MEMBER.compile(getId(), Long.toUnsignedString(id));
         return new RestActionImpl<>(api, route);
@@ -444,5 +455,13 @@ public class ThreadChannelImpl extends AbstractGuildChannelImpl<ThreadChannelImp
     {
         if (archived)
             throw new IllegalStateException("Cannot modify a ThreadChannel while it is archived!");
+    }
+
+    private void checkInvitable()
+    {
+        if (ownerId == api.getSelfUser().getIdLong()) return;
+
+        if (!isPublic() && !isInvitable())
+            checkPermission(Permission.MANAGE_THREADS);
     }
 }
