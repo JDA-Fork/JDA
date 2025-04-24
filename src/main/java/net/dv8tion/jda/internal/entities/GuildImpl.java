@@ -32,9 +32,12 @@ import net.dv8tion.jda.api.entities.channel.attribute.IThreadContainer;
 import net.dv8tion.jda.api.entities.channel.concrete.*;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.entities.channel.unions.DefaultGuildChannelUnion;
 import net.dv8tion.jda.api.entities.emoji.CustomEmoji;
 import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
+import net.dv8tion.jda.api.entities.guild.SecurityIncidentActions;
+import net.dv8tion.jda.api.entities.guild.SecurityIncidentDetections;
 import net.dv8tion.jda.api.entities.sticker.GuildSticker;
 import net.dv8tion.jda.api.entities.sticker.StandardSticker;
 import net.dv8tion.jda.api.entities.sticker.StickerSnowflake;
@@ -64,6 +67,7 @@ import net.dv8tion.jda.api.utils.data.DataArray;
 import net.dv8tion.jda.api.utils.data.DataObject;
 import net.dv8tion.jda.internal.JDAImpl;
 import net.dv8tion.jda.internal.entities.automod.AutoModRuleImpl;
+import net.dv8tion.jda.internal.entities.channel.mixin.middleman.GuildChannelMixin;
 import net.dv8tion.jda.internal.handle.EventCache;
 import net.dv8tion.jda.internal.interactions.CommandDataImpl;
 import net.dv8tion.jda.internal.interactions.command.CommandImpl;
@@ -128,6 +132,8 @@ public class GuildImpl implements Guild
     private TextChannel communityUpdatesChannel;
     private TextChannel safetyAlertsChannel;
     private Role publicRole;
+    private SecurityIncidentActions securityIncidentActions = SecurityIncidentActions.disabled();
+    private SecurityIncidentDetections securityIncidentDetections = SecurityIncidentDetections.EMPTY;
     private VerificationLevel verificationLevel = VerificationLevel.UNKNOWN;
     private NotificationLevel defaultNotificationLevel = NotificationLevel.UNKNOWN;
     private MFALevel mfaLevel = MFALevel.UNKNOWN;
@@ -147,6 +153,12 @@ public class GuildImpl implements Guild
             memberPresences = new CacheView.SimpleCacheView<>(MemberPresenceImpl.class, null);
         else
             memberPresences = null;
+    }
+
+    @Override
+    public boolean isDetached()
+    {
+        return false;
     }
 
     public void invalidate()
@@ -592,6 +604,22 @@ public class GuildImpl implements Guild
 
     @Nonnull
     @Override
+    public RestAction<List<ScheduledEvent>> retrieveScheduledEvents(boolean includeUserCount)
+    {
+        Route.CompiledRoute route = Route.Guilds.GET_SCHEDULED_EVENTS.compile(getId())
+                .withQueryParams("with_user_count", String.valueOf(includeUserCount));
+
+        EntityBuilder entityBuilder = getJDA().getEntityBuilder();
+        return new RestActionImpl<>(getJDA(), route,
+                (response, request) -> Helpers.mapGracefully(
+                        response.getArray().stream(DataArray::getObject),
+                        data -> entityBuilder.createScheduledEvent(this, data),
+                        "Failed to parse scheduled event"
+                ).collect(Helpers.toUnmodifiableList()));
+    }
+
+    @Nonnull
+    @Override
     public CacheRestAction<ScheduledEvent> retrieveScheduledEventById(@Nonnull String id)
     {
         Checks.isSnowflake(id);
@@ -689,6 +717,20 @@ public class GuildImpl implements Guild
     public Timeout getAfkTimeout()
     {
         return afkTimeout;
+    }
+
+    @Nonnull
+    @Override
+    public SecurityIncidentActions getSecurityIncidentActions()
+    {
+        return securityIncidentActions;
+    }
+
+    @Nonnull
+    @Override
+    public SecurityIncidentDetections getSecurityIncidentDetections()
+    {
+        return securityIncidentDetections;
     }
 
     @Override
@@ -1164,6 +1206,23 @@ public class GuildImpl implements Guild
 
     @Nonnull
     @Override
+    @CheckReturnValue
+    public RestAction<GuildVoiceState> retrieveMemberVoiceStateById(long id)
+    {
+        JDAImpl jda = getJDA();
+        Route.CompiledRoute route = Route.Guilds.GET_VOICE_STATE.compile(getId(), Long.toUnsignedString(id));
+        return new RestActionImpl<>(jda, route, (response, request) ->
+        {
+            EntityBuilder entityBuilder = jda.getEntityBuilder();
+            DataObject voiceStateData = response.getObject();
+            MemberImpl member = entityBuilder.createMember(this, voiceStateData.getObject("member"), null, null);
+            entityBuilder.updateMemberCache(member);
+            return entityBuilder.createGuildVoiceState(member, voiceStateData);
+        });
+    }
+
+    @Nonnull
+    @Override
     public VerificationLevel getVerificationLevel()
     {
         return verificationLevel;
@@ -1523,6 +1582,20 @@ public class GuildImpl implements Guild
 
     @Nonnull
     @Override
+    public AuditableRestAction<Void> modifySecurityIncidents(@Nonnull SecurityIncidentActions incidents)
+    {
+        Checks.notNull(incidents, "SecurityIncidentActions");
+        checkPermission(Permission.MANAGE_SERVER);
+
+        Route.CompiledRoute route = Route.Guilds.MODIFY_GUILD_INCIDENTS.compile(getId());
+        DataObject body = DataObject.empty()
+                .put("invites_disabled_until", Objects.toString(incidents.getInvitesDisabledUntil(), null))
+                .put("dms_disabled_until", Objects.toString(incidents.getDirectMessagesDisabledUntil(), null));
+        return new AuditableRestActionImpl<>(api, route, body);
+    }
+
+    @Nonnull
+    @Override
     public AuditableRestAction<Void> kick(@Nonnull UserSnowflake user)
     {
         Checks.notNull(user, "User");
@@ -1641,7 +1714,6 @@ public class GuildImpl implements Guild
     public AuditableRestAction<Void> deafen(@Nonnull UserSnowflake user, boolean deafen)
     {
         Checks.notNull(user, "User");
-        checkPermission(Permission.VOICE_DEAF_OTHERS);
 
         Member member = resolveMember(user);
         if (member != null)
@@ -1649,10 +1721,12 @@ public class GuildImpl implements Guild
             GuildVoiceState voiceState = member.getVoiceState();
             if (voiceState != null)
             {
-                if (voiceState.getChannel() == null)
+                final AudioChannelUnion channel = voiceState.getChannel();
+                if (channel == null)
                     throw new IllegalStateException("Can only deafen members who are currently in a voice channel");
                 if (voiceState.isGuildDeafened() == deafen)
                     return new CompletedRestAction<>(getJDA(), null);
+                ((GuildChannelMixin<?>) channel).checkPermission(Permission.VOICE_DEAF_OTHERS);
             }
         }
 
@@ -1666,7 +1740,6 @@ public class GuildImpl implements Guild
     public AuditableRestAction<Void> mute(@Nonnull UserSnowflake user, boolean mute)
     {
         Checks.notNull(user, "User");
-        checkPermission(Permission.VOICE_MUTE_OTHERS);
 
         Member member = resolveMember(user);
         if (member != null)
@@ -1674,10 +1747,12 @@ public class GuildImpl implements Guild
             GuildVoiceState voiceState = member.getVoiceState();
             if (voiceState != null)
             {
-                if (voiceState.getChannel() == null)
+                final AudioChannelUnion channel = voiceState.getChannel();
+                if (channel == null)
                     throw new IllegalStateException("Can only mute members who are currently in a voice channel");
                 if (voiceState.isGuildMuted() == mute && (mute || !voiceState.isSuppressed()))
                     return new CompletedRestAction<>(getJDA(), null);
+                ((GuildChannelMixin<?>) channel).checkPermission(Permission.VOICE_MUTE_OTHERS);
             }
         }
 
@@ -2209,6 +2284,18 @@ public class GuildImpl implements Guild
     public GuildImpl setPublicRole(Role publicRole)
     {
         this.publicRole = publicRole;
+        return this;
+    }
+
+    public GuildImpl setSecurityIncidentActions(SecurityIncidentActions actions)
+    {
+        this.securityIncidentActions = actions == null ? SecurityIncidentActions.disabled() : actions;
+        return this;
+    }
+
+    public GuildImpl setSecurityIncidentDetections(SecurityIncidentDetections detections)
+    {
+        this.securityIncidentDetections = detections == null ? SecurityIncidentDetections.EMPTY : detections;
         return this;
     }
 
