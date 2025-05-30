@@ -34,6 +34,7 @@ import org.mockito.Mock;
 
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
+import java.io.InputStream;
 import java.util.EnumSet;
 import java.util.Random;
 import java.util.concurrent.ScheduledExecutorService;
@@ -42,7 +43,7 @@ import java.util.function.Consumer;
 import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.openMocks;
 
-public class IntegrationTest
+public class IntegrationTest extends AbstractSnapshotTest
 {
     protected Random random = new Random();
     @Mock
@@ -85,7 +86,7 @@ public class IntegrationTest
     protected RestActionAssertions assertThatRequestFrom(@Nonnull RestAction<?> action)
     {
         expectedRequestCount += 1;
-        return RestActionAssertions.assertThatNextAction(requester, action)
+        return RestActionAssertions.assertThatNextAction(snapshotHandler, requester, action)
                 .withNormalizedBody(this::normalizeRequestBody);
     }
 
@@ -117,5 +118,10 @@ public class IntegrationTest
     protected void withCacheFlags(EnumSet<CacheFlag> flags)
     {
         when(jda.getCacheFlags()).thenReturn(flags);
+    }
+
+    protected InputStream getResource(String path)
+    {
+        return getClass().getResourceAsStream("/" + path);
     }
 }
