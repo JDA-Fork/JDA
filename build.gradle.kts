@@ -47,7 +47,7 @@ plugins {
 ////////////////////////////////////
 
 projectEnvironment {
-    version = Version(major = "6", minor = "0", revision = "0", classifier = "rc.1")
+    version = Version(major = "6", minor = "0", revision = "0", classifier = "rc.2")
 }
 
 artifactFilters {
@@ -89,6 +89,8 @@ configure<SourceSetContainer> {
 //    Dependency Configuration    //
 //                                //
 ////////////////////////////////////
+
+val mockitoAgent by configurations.creating
 
 repositories {
     mavenCentral()
@@ -142,6 +144,10 @@ dependencies {
     testImplementation(libs.commons.lang3)
     testImplementation(libs.logback.classic)
     testImplementation(libs.archunit)
+
+    mockitoAgent(libs.mockito) {
+        isTransitive = false
+    }
 
     // OpenRewrite
     // Import Rewrite's bill of materials.
@@ -326,7 +332,7 @@ tasks.named<JavaCompile>("compileJava").configure {
     source = generateJavaSources.get().source
 }
 
-tasks.named("build").configure {
+tasks.build.configure {
     dependsOn(jar)
     dependsOn(javadocJar)
     dependsOn(sourcesJar)
@@ -337,6 +343,14 @@ tasks.named("build").configure {
     jar.mustRunAfter(tasks.clean)
     shadowJar.mustRunAfter(sourcesJar)
 }
+
+
+////////////////////////////////////
+//                                //
+//       Test Configuration       //
+//                                //
+////////////////////////////////////
+
 
 val downloadRecipeClasspath by tasks.registering(Download::class) {
     val targetVersion = "5.6.1"
@@ -357,7 +371,22 @@ tasks.register<Test>("updateTestSnapshots") {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     failFast = false
+
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+        jvmArgs = listOf("-javaagent:${mockitoAgent.asPath}")
+    }
 }
+
+tasks.test {
+    testLogging {
+        events("passed", "skipped", "failed")
+    }
+    reports {
+        junitXml.required = projectEnvironment.isGithubAction
+        html.required = projectEnvironment.isGithubAction
+    }
+}
+
 
 ////////////////////////////////////
 //                                //
