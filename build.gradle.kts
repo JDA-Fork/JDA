@@ -47,7 +47,7 @@ plugins {
 ////////////////////////////////////
 
 projectEnvironment {
-    version = Version(major = "6", minor = "0", revision = "0", classifier = "rc.4")
+    version = Version(major = "6", minor = "0", revision = "0", classifier = null)
 }
 
 artifactFilters {
@@ -242,7 +242,7 @@ val noOpusJar by tasks.registering(ShadowJar::class) {
     configurations = shadowJar.configurations
     from(sourceSets["main"].output)
     applyOpusExclusions(artifactFilters)
-    manifest.inheritFrom(jar.manifest)
+    manifest.from(jar.manifest)
 }
 
 val minimalJar by tasks.registering(ShadowJar::class) {
@@ -253,7 +253,7 @@ val minimalJar by tasks.registering(ShadowJar::class) {
     configurations = shadowJar.configurations
     from(sourceSets["main"].output)
     applyAudioExclusions(artifactFilters)
-    manifest.inheritFrom(jar.manifest)
+    manifest.from(jar.manifest)
 }
 
 val sourcesJar by tasks.registering(Jar::class) {
