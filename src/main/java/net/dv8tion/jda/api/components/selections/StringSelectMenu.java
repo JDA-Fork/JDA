@@ -113,6 +113,9 @@ public interface StringSelectMenu extends SelectMenu {
         builder.addOptions(getOptions());
         builder.setDisabled(isDisabled());
         builder.setRequired(isRequired());
+        if (getUniqueId() > 0) {
+            builder.setUniqueId(getUniqueId());
+        }
         return builder;
     }
 
@@ -375,6 +378,7 @@ public interface StringSelectMenu extends SelectMenu {
          *             <li>If {@link #getMinValues()} is greater than {@link #getMaxValues()}</li>
          *             <li>If no options are provided</li>
          *             <li>If more than {@value #OPTIONS_MAX_AMOUNT} options are provided</li>
+         *             <li>If the minimum value range is 0 and a selection is also explicitly required</li>
          *         </ul>
          *
          * @return The new {@link StringSelectMenu} instance
@@ -387,6 +391,11 @@ public interface StringSelectMenu extends SelectMenu {
                     options.size() <= OPTIONS_MAX_AMOUNT,
                     "Cannot build a select menu with more than %d options.",
                     OPTIONS_MAX_AMOUNT);
+            if (required != null && required) {
+                Checks.check(
+                        minValues > 0,
+                        "A select menu cannot have min values set to 0 and be required at the same time");
+            }
             int min = Math.min(minValues, options.size());
             int max = Math.min(maxValues, options.size());
             return new StringSelectMenuImpl(customId, uniqueId, placeholder, min, max, disabled, options, required);
