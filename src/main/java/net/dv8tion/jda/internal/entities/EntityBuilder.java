@@ -104,8 +104,8 @@ public class EntityBuilder extends AbstractEntityBuilder {
     public static final String MISSING_CHANNEL = "MISSING_CHANNEL";
     public static final String MISSING_USER = "MISSING_USER";
     public static final String UNKNOWN_MESSAGE_TYPE = "UNKNOWN_MESSAGE_TYPE";
-    public static final ComponentDeserializer DEFAULT_COMPONENT_DESERIALIZER =
-            new ComponentDeserializer(Collections.emptyList());
+    public static final ComponentDeserializer DEFAULT_COMPONENT_DESERIALIZER = new ComponentDeserializer(
+            Collections.emptyList(), EnumSet.of(ComponentDeserializer.DeserializerFeature.REQUIRE_MEDIA_PROXY_URL));
     private static final Set<String> richGameFields;
 
     static {
@@ -172,6 +172,23 @@ public class EntityBuilder extends AbstractEntityBuilder {
         } else { // name can be empty in some cases where discord fails to properly load the emoji
             return new CustomEmojiImpl(emoji.getString(nameKey, ""), id, emoji.getBoolean("animated"));
         }
+    }
+
+    public SoundboardSound createSoundboardSound(DataObject json) {
+        String name = json.getString("name");
+        long id = json.getLong("sound_id");
+        double volume = json.getDouble("volume");
+        EmojiUnion emoji;
+        if (!json.isNull("emoji_name") || !json.isNull("emoji_id")) {
+            emoji = createEmoji(json, "emoji_name", "emoji_id");
+        } else {
+            emoji = null;
+        }
+        Guild guild = getJDA().getGuildById(json.getLong("guild_id", 0));
+        boolean available = json.getBoolean("available");
+        User user = json.optObject("user").map(this::createUser).orElse(null);
+
+        return new SoundboardSoundImpl(api, id, name, volume, emoji, guild, available, user);
     }
 
     public static SKU createSKU(DataObject object) {
@@ -254,6 +271,29 @@ public class EntityBuilder extends AbstractEntityBuilder {
         }
     }
 
+    private void createGuildSoundboardSoundPass(GuildImpl guildObj, DataArray array) {
+        if (!getJDA().isCacheFlagSet(CacheFlag.SOUNDBOARD_SOUNDS)) {
+            return;
+        }
+        SnowflakeCacheViewImpl<SoundboardSound> soundboardView = guildObj.getSoundboardSoundsView();
+        try (UnlockHook hook = soundboardView.writeLock()) {
+            TLongObjectMap<SoundboardSound> soundboardMap = soundboardView.getMap();
+            for (int i = 0; i < array.length(); i++) {
+                DataObject object = array.getObject(i);
+                if (object.isNull("sound_id")) {
+                    LOG.error(
+                            "Received GUILD_CREATE with a sound with a null ID. GuildId: {} JSON: {}",
+                            guildObj.getId(),
+                            object);
+                    continue;
+                }
+
+                SoundboardSound sound = createSoundboardSound(object);
+                soundboardMap.put(sound.getIdLong(), sound);
+            }
+        }
+    }
+
     public SecurityIncidentActions createSecurityIncidentsActions(DataObject data) {
         OffsetDateTime invitesDisabledUntil = data.getOffsetDateTime("invites_disabled_until", null);
         OffsetDateTime dmsDisabledUntil = data.getOffsetDateTime("dms_disabled_until", null);
@@ -303,6 +343,7 @@ public class EntityBuilder extends AbstractEntityBuilder {
         DataArray emojisArray = guildJson.getArray("emojis");
         DataArray voiceStateArray = guildJson.getArray("voice_states");
         Optional<DataArray> stickersArray = guildJson.optArray("stickers");
+        Optional<DataArray> soundboardSoundsArray = guildJson.optArray("soundboard_sounds");
         Optional<DataArray> featuresArray = guildJson.optArray("features");
         Optional<DataArray> presencesArray = guildJson.optArray("presences");
         long ownerId = guildJson.getUnsignedLong("owner_id", 0L);
@@ -433,6 +474,7 @@ public class EntityBuilder extends AbstractEntityBuilder {
         createScheduledEventPass(guildObj, scheduledEventsArray);
         createGuildEmojiPass(guildObj, emojisArray);
         stickersArray.ifPresent(stickers -> createGuildStickerPass(guildObj, stickers));
+        soundboardSoundsArray.ifPresent(sound -> createGuildSoundboardSoundPass(guildObj, sound));
         guildJson
                 .optArray("stage_instances")
                 .map(arr -> arr.stream(DataArray::getObject))
@@ -821,7 +863,7 @@ public class EntityBuilder extends AbstractEntityBuilder {
     private void updateMemberRoles(MemberImpl member, List<Role> newRoles, long responseNumber) {
         Set<Role> currentRoles = member.getRoleSet();
         // Find the roles removed.
-        List<Role> removedRoles = new LinkedList<>();
+        List<Role> removedRoles = new ArrayList<>();
         each:
         for (Role role : currentRoles) {
             for (Iterator<Role> it = newRoles.iterator(); it.hasNext(); ) {
@@ -1077,6 +1119,8 @@ public class EntityBuilder extends AbstractEntityBuilder {
         ScheduledEvent.Type type = ScheduledEvent.Type.fromKey(json.getInt("entity_type"));
         scheduledEvent.setType(type);
         switch (type) {
+            case UNKNOWN:
+                break;
             case STAGE_INSTANCE:
             case VOICE:
                 scheduledEvent.setLocation(json.getString("channel_id"));
